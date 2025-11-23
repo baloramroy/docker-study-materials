@@ -68,5 +68,11 @@
   ```bash
   sudo dnf versionlock list
   ```
-  
+
+##
+
 > **N.B: Then log out and log in again.**
+
+##
+
+> **N.B:** Also you don't have to install docker compose additionally. Because after **docker v20.10**, docker compose comes with a docker package called **docker-compose-plugin**.
