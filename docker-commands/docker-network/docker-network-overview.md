@@ -14,8 +14,8 @@ Manage Docker networks. You can use **subcommands** to **create, inspect, list, 
 
 -   Connect a container to a network
     ```bash
-	  docker network connect
-	  ```
+  	docker network connect
+  	```
     
 -   Create a network
 	```bash
