@@ -6,14 +6,14 @@
 Lists all the networks the Engine **daemon** knows about. This includes the networks that span across **multiple hosts** in a cluster.
 
 - Usage
-```
-docker network ls [OPTIONS]
-```
+  ```
+  docker network ls [OPTIONS]
+  ```
 
 - Aliases
-```
-docker network list
-```
+  ```
+  docker network list
+  ```
 
 #
 
