@@ -72,13 +72,11 @@ So Docker moved all networking logic into a separate tool called **libnetwork**.
 
 Docker networking consists of **two** layers:
 
-- **Control Plane – Managed by libnetwork**
-  
-  Handles mostly supervised **network creation**, **configuration**, and **management**.
+**1. Control Plane – Managed by libnetwork**
+- Handles mostly supervised **network creation**, **configuration**, and **management**.
 
-- **Data Plane – Managed by drivers**
-
-  Responsible for actually **creating networks**, **connecting containers**, and **isolating them**.
+**2. Data Plane – Managed by drivers**
+- Responsible for actually **creating networks**, **connecting containers**, and **isolating them**.
 
 ---
 
