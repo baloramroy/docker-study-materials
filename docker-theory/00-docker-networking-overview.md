@@ -12,7 +12,7 @@ At a high level, **Docker networking** is built around three main components:
 - It’s **open-source** and used by Docker to manage networking.
 
 **Drivers**
-- These are tools that create different types of networks, like **overlay networks**.
+- These are tools that create different types of networks, like **overlay, bridge networks**.
   
 ---
 
