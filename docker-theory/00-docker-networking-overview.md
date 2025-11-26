@@ -18,7 +18,7 @@ At a high level, **Docker networking** is built around three main components:
 
 ## Explanation of those three components
 
-### The Container Network Model (CNM)
+### 1. The Container Network Model (CNM)
 
 Docker networking is designed using something called the **Container Network Model (CNM)**. It’s like the **blueprint** for how networking works in containers.
 
@@ -51,7 +51,7 @@ It’s built on **three** key parts:
 * Even if containers are on the same **Docker host**, they’re still **isolated**. They can only communicate through a **Docker-defined network**.
 
 
-### Libnetwork
+### 2. Libnetwork
 
 **Libnetwork** is the system that handles all networking in Docker.
 Before it existed, networking code was inside the **Docker daemon**, which made Docker complicated.
@@ -66,7 +66,7 @@ So Docker moved all networking logic into a separate tool called **libnetwork**.
 * **Management APIs**: Provides APIs so Docker and other tools can control networking.
 
 
-### Drivers
+### 3. Drivers
 
 **Drivers** are the tools that actually build and run the actual network creation and connecting job.
 
