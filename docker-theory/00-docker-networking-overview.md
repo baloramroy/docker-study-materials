@@ -16,7 +16,7 @@ At a high level, **Docker networking** is built around three main components:
   
 ---
 
-## Explanation of those three components
+## Explanation of those Three components
 
 ### 1. The Container Network Model (CNM)
 
