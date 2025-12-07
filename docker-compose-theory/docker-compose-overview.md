@@ -2,7 +2,7 @@
 
 ## What is Docker Compose?
 Docker Compose is a tool that lets you define and run multiple containers (multi-container applications) using a single YAML file called **docker-compose.yml**.
-Instead of running containers one by one with long commands, you write everything in the YAML file and then start all services using:
+Instead of running containers one by one with long commands, you write everything in the **YAML** file and then start all services using:
 
 ```bash
 docker compose up -d
@@ -14,7 +14,7 @@ Think of Docker Compose as:
 * A tool to run services together easily (e.g., web + database + monitoring)
 
 ## How Docker Compose Works
-Docker Compose works through three main steps:
+Docker Compose works through **three** main steps:
 
 ### Step 1 – Define services in a YAML file
 You create a **docker-compose.yml** file.
@@ -52,7 +52,7 @@ Docker Compose reads your YAML file and understands:
 * How many containers to **run**
 * Which container **depends** on which
 
-Compose then creates everything **automatically**.
+>Compose then creates everything **automatically**.
 
 
 ### Step 3 – Compose manages the lifecycle
@@ -64,7 +64,7 @@ Compose allows you to:
 * View **running** services
 
 **Common commands:**
-```
+```bash
 docker compose up -d
 docker compose down
 docker compose ps
@@ -72,7 +72,6 @@ docker compose logs -f
 ```
 
 ## Why Use Docker Compose?
-Here are the reasons, explained in a simple way.
 
 ### Reason 1 — Easy Multi-Container Setup
 If your application needs:
@@ -84,9 +83,9 @@ If your application needs:
 * Prometheus
 * Grafana
   
-…it would be **painful** to run all using individual `docker run` commands.
-Compose allows you to start everything with **one command**:
+it would be **painful** to run all using individual `docker run` commands.
 
+Compose allows you to start everything with **one command**:
 ```bash
 docker compose up -d
 ```
@@ -106,7 +105,7 @@ Compose automatically creates a **network** for your services so they can talk u
 `web → talks to → db`  
 Using name → **db:3306**
 
-No need to manually create networks.
+>No need to manually create networks.
 
 ### Reason 4 — Handles Volumes Automatically
 You can define **persistent storage** in the YAML file:
@@ -121,15 +120,15 @@ services:
     volumes:
       - db-data:/var/lib/mysql
 ```
-Compose **creates and manages** this volume for you.
+>Compose **creates and manages** this volume for you.
 
 ### Reason 5 — Easy Updates and Rebuilds
 Updated your app code?
-- Then use:
-  ```bash
-  docker compose up -d --build
-  ```
-Compose **rebuilds and restarts** only what changed.
+Then use:
+```bash
+docker compose up -d --build
+```
+>Compose **rebuilds and restarts** only what changed.
 
 ### Reason 6 — Consistency Across Environments
 Same **docker-compose.yml** works on:
@@ -138,7 +137,7 @@ Same **docker-compose.yml** works on:
 * Your staging server
 * Your production server
   
-This ensures your environment is **consistent**.
+>This ensures your environment is **consistent**.
 
 ### Reason 7 — Faster Development
 Compose supports:
@@ -146,4 +145,4 @@ Compose supports:
 * **Environment files** (.env)
 * **Command overrides**
 
-Great for everyday **development** work.
+>Great for everyday **development** work.
