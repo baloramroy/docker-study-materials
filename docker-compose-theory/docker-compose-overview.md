@@ -73,7 +73,7 @@ docker compose logs -f
 
 ## Why Use Docker Compose?
 
-### Reason 1 — Easy Multi-Container Setup
+### Reason 1 - Easy Multi-Container Setup
 If your application needs:
 * Backend
 * Frontend
@@ -90,7 +90,7 @@ Compose allows you to start everything with **one command**:
 docker compose up -d
 ```
 
-### Reason 2 — Everything in One Configuration File
+### Reason 2 - Everything in One Configuration File
 Your entire environment is stored in a **single file**: `docker-compose.yml`
 
 **Benefits:**
@@ -98,7 +98,7 @@ Your entire environment is stored in a **single file**: `docker-compose.yml`
 * Easy to **version-control**
 * Easy to **understand** what’s running
 
-### Reason 3 — Handles Networking Automatically
+### Reason 3 - Handles Networking Automatically
 Compose automatically creates a **network** for your services so they can talk using service names:
 
 **Example:**
@@ -107,7 +107,7 @@ Using name → **db:3306**
 
 >No need to manually create networks.
 
-### Reason 4 — Handles Volumes Automatically
+### Reason 4 - Handles Volumes Automatically
 You can define **persistent storage** in the YAML file:
 ```yaml
 volumes:
@@ -122,7 +122,7 @@ services:
 ```
 >Compose **creates and manages** this volume for you.
 
-### Reason 5 — Easy Updates and Rebuilds
+### Reason 5 - Easy Updates and Rebuilds
 Updated your app code?
 Then use:
 ```bash
@@ -130,7 +130,7 @@ docker compose up -d --build
 ```
 >Compose **rebuilds and restarts** only what changed.
 
-### Reason 6 — Consistency Across Environments
+### Reason 6 - Consistency Across Environments
 Same **docker-compose.yml** works on:
 * Your laptop
 * Another person’s laptop
@@ -139,7 +139,7 @@ Same **docker-compose.yml** works on:
   
 >This ensures your environment is **consistent**.
 
-### Reason 7 — Faster Development
+### Reason 7 - Faster Development
 Compose supports:
 * **Live code mounting** (bind mounts)
 * **Environment files** (.env)
