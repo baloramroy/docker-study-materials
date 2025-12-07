@@ -33,5 +33,6 @@ Docker Compose can be installed in **three** different ways, depending on your s
 - Used only on:
   * Linux (older systems)
   * Windows Server
-
-  >**Note:** Use only if you must support older environments.
+    
+  **Note:**
+  >Use only if you must support older environments.
