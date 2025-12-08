@@ -1,4 +1,4 @@
-# Docker Compose Installation
+# Docker Compose Installation for Different Platform
 
 Docker Compose can be installed in **three** different ways, depending on your system and needs.
 
