@@ -3,13 +3,13 @@ This document shows you how to use the docker help command on every docker comma
 
 ## General help Command
 
-**Command:**
-```bash
-docker --help
-```
+- **Command:**
+  ```bash
+  docker --help
+  ```
 
-**Output:**
-> Shows the top-level Docker help with all available management commands and subcommands.
+- **Output:**
+  > Shows the top-level Docker help with all available management commands and subcommands.
 
 
 ## Docker help on any command
