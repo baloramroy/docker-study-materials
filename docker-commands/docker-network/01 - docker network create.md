@@ -12,9 +12,10 @@ Creates a **new** network. The DRIVER accepts **bridge or overlay** which are th
 ## Create a Bridge Network
 
 - **Create a standard user-defined bridge network**
+  ```bash
+  docker network create my_bridge
   ```
-  **docker network create my_bridge**
-  ```
+  
   **Output:** Creates a custom bridge network.\
   **Note:** if you do not mention the driver, Docker always creates a bridge network by default.
 
@@ -30,8 +31,7 @@ Creates a **new** network. The DRIVER accepts **bridge or overlay** which are th
   ```bash
   docker network create --subnet=10.10.1.0/24 --ip-range=10.10.1.10/28 my_fixed_ip_net
   ```
-  **Output:** Allows specific IP address range for containers.These are the IPs Docker will auto-assign to containers unless you manually specify an IP.\
-  **Purpose:** You may want to reserve the rest of the subnet for something else — e.g., another network, firewall rules, or future expansion.
+  **Output:** Allows specific IP address range for containers.These are the IPs Docker will auto-assign to containers unless you manually specify an IP.
 
 - **You can also manually assign an IP from anywhere in the subnet created earlier:**
   
@@ -70,4 +70,39 @@ Creates a **new** network. The DRIVER accepts **bridge or overlay** which are th
 
 ---
 
-  
+## Create an Internal-Only Network
+- **Internal network (no outside access)**
+  ```bash
+  docker network create --internal internal_net
+  ```
+  **Output:** Containers cannot reach external networks.\
+  **Purpose:** Security hardening (backend, DB-only networks).
+
+---
+
+## Create a Network with Custom Options
+
+- **Set bridge isolation (per-container isolation)**
+  ```bash
+  docker network create --opt com.docker.network.bridge.enable_icc=false isolated_net
+  ```
+  **Output:** Blocks container-to-container communication.\
+  **Purpose:** Security requirement in many production setups.
+
+- **Set custom bridge name**
+  ```bash
+  docker network create --opt com.docker.network.bridge.name=br_custom custom_bridge
+  ```
+  **Output:** Creates Linux bridge named br_custom.
+
+---
+
+## Create a Network with Labels
+
+```bash
+docker network create --label env=prod --label team=devops prod_net
+```
+**Output:** Network gets metadata labels.\
+**Purpose:** Useful for automation, CI/CD, inventory.
+
+---  
