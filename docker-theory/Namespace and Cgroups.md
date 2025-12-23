@@ -5,7 +5,7 @@
 
 Before namespaces and cgroups, Linux had only **processes**.
 
-✅ All processes could:
+**All processes could:**
 * See each other
 * Compete freely for CPU and memory
 * Share the same filesystem view
@@ -14,7 +14,7 @@ Before namespaces and cgroups, Linux had only **processes**.
 This was **not safe**, **not isolated**, and **not scalable**.
 
 
-✅ Linux solved this with **two kernel features**:
+Linux solved this with **two kernel features**:
 
 1. **Namespaces** → *Isolation (What a process only can see)*
 2. **cgroups** → *Resource control (What a process only  can use)*
@@ -23,6 +23,7 @@ Containers = **Processes + Namespaces + cgroups**\
 Nothing more.
 
 >The Real Foundation of Containers
+
 ---
 
 ## 1. Namespace
@@ -84,21 +85,21 @@ We’ll explore them **one by one**.
 
 **Key Rules**
 
-1. **PID namespaces are hierarchical**\
-*- Parent can see child processes*\
-*- Child cannot see parent processes*
+- **PID namespaces are hierarchical**\
+  *Parent can see child processes*\
+  *Child cannot see parent processes*
 
-1. **PID 1 is special**\
-*- Responsible for Reaping zombie processes*\
-*- Responsible for Signal handling*\
-*- If PID 1 dies → namespace dies*
+- **PID 1 is special**\
+  *Responsible for Reaping zombie processes*\
+  *Responsible for Signal handling*\
+  *If PID 1 dies → namespace dies*
 
-1. **Processes join PID namespace at creation**\
-*- Cannot be moved later*\
-*- Requires `clone()` or `unshare`*
+- **Processes join PID namespace at creation**\
+  *Cannot be moved later*\
+  *Requires `clone()` or `unshare`*
 
-1. **`/proc` is PID-namespace aware**\
-*`/proc` only shows processes in that namespace*
+- **`/proc` is PID-namespace aware**\
+  *`/proc` only shows processes in that namespace*
 
 
 **Real Container Example**
@@ -164,20 +165,20 @@ With NET namespace, each namespace gets its **own complete network stack**, incl
 
 **Key Rules**
 
-1. **Network namespaces are fully isolated**\
-*No shared interfaces by default*
+- **Network namespaces are fully isolated**\
+  *No shared interfaces by default*
 
-1. **Each NET namespace starts with only `lo`**\
-*External access requires virtual interfaces (veth)*
+- **Each NET namespace starts with only `lo`**\
+  *External access requires virtual interfaces (veth)*
 
-1. **Port conflicts do not exist across namespaces**\
-*Same port number can be reused safely*
+- **Port conflicts do not exist across namespaces**\
+  *Same port number can be reused safely*
 
-1. **NET namespace ≠ DNS isolation**\
-*DNS comes from `/etc/resolv.conf` (MNT namespace)*
+- **NET namespace ≠ DNS isolation**\
+  *DNS comes from `/etc/resolv.conf` (MNT namespace)*
 
-2. **Bridges connect namespaces**\
-*Docker uses Linux bridges (e.g., `docker0`)*
+- **Bridges connect namespaces**\
+  *Docker uses Linux bridges (e.g., `docker0`)*
 
 **Real Container Example**
 
@@ -234,23 +235,23 @@ A **MNT (Mount) namespace** is a Linux kernel feature that **isolates filesystem
 
 **Key Rules**
 
-1. **MNT namespace isolates mount points, not files**\
-*Same underlying filesystem can be mounted in multiple places*
+- **MNT namespace isolates mount points, not files**\
+  *Same underlying filesystem can be mounted in multiple places*
 
-1. **Each namespace starts as a copy of the parent**\
-*Isolation happens after namespace creation*
+- **Each namespace starts as a copy of the parent**\
+  *Isolation happens after namespace creation*
 
-1. **Mount propagation matters**\
-*- private → not shared*\
-*- shared → visible across namespaces*\
-*- slave → one-way sharing*
+- **Mount propagation matters**\
+  *private → not shared*\
+  *shared → visible across namespaces*\
+  *slave → one-way sharing*
 
-1. **Works together with `pivot_root`**\
-*Containers change `/` safely using MNT namespace*
+- **Works together with `pivot_root`**\
+  *Containers change `/` safely using MNT namespace*
 
-1. **chroot ≠ container**\
-*- chroot alone is insecure*\
-*- chroot + MNT namespace = container filesystem isolation*
+- **chroot ≠ container**\
+  *chroot alone is insecure*\
+  *chroot + MNT namespace = container filesystem isolation*
 
 **Real Container Example**
 
@@ -317,18 +318,18 @@ A **UTS (UNIX Time-Sharing) namespace** is a Linux kernel feature that **isolate
 
 **Key Rules**
 
-1. **UTS namespace only isolates identity**\
-  Does **not** isolate network, IP, or DNS
+- **UTS namespace only isolates identity**\
+  *Does **not** isolate network, IP, or DNS*
 
-1. **Commands affected**\
+- **Commands affected**\
 *- `hostname`*\
 *- `uname -n`*
 
-1. **DNS is not handled by UTS**\
-DNS comes from `/etc/resolv.conf` (MNT namespace)
+- **DNS is not handled by UTS**\
+  *DNS comes from `/etc/resolv.conf` (MNT namespace)*
 
-1. **Almost always used with NET namespace**\
-Hostname alone is not useful without network isolation
+- **Almost always used with NET namespace**\
+  *Hostname alone is not useful without network isolation*
 
 **Real Container Example**
 
@@ -413,18 +414,18 @@ iii. Shared Memory
 
 **Key Rules**
 
-1. **IPC namespace does NOT isolate Unix domain sockets**\
-Those are filesystem-based\
-Isolated by **MNT namespace + permissions**
+- **IPC namespace does NOT isolate Unix domain sockets**\
+  *Those are filesystem-based*\
+  *Isolated by **MNT namespace + permissions***
 
-2. **IPC namespace is usually paired with PID namespace**\
-IPC objects are tied to process ownership
+- **IPC namespace is usually paired with PID namespace**\
+  *IPC objects are tied to process ownership*
 
-3. **IPC objects have UID/GID ownership**\
-USER namespace improves security
+- **IPC objects have UID/GID ownership**\
+  *USER namespace improves security*
 
-4. **Most containers use IPC namespace by default**\
-Can be shared intentionally (e.g., Kubernetes Pods)
+- **Most containers use IPC namespace by default**\
+  *Can be shared intentionally (e.g., Kubernetes Pods)*
 
 
 ## Real Container Example
@@ -494,22 +495,22 @@ Same process, different identities.
 
 **Key Rules**
 
-1. **USER namespace must be created first**\
-Other namespaces depend on it for permissions
+- **USER namespace must be created first**\
+  *Other namespaces depend on it for permissions*
 
-2. **UID/GID mappings are fixed at creation**\
-Cannot be changed later
+- **UID/GID mappings are fixed at creation**\
+  *Cannot be changed later*
 
-3. **Capabilities are filtered**\
-Even container root lacks many kernel powers
+- **Capabilities are filtered**\
+  *Even container root lacks many kernel powers*
 
-4. **Mapping is defined in**
+- **Mapping is defined in**
 
    * `/etc/subuid`
    * `/etc/subgid`
 
-5. **USER namespace ≠ authentication**\
-It controls kernel permissions, not login users
+- **USER namespace ≠ authentication**\
+  *It controls kernel permissions, not login users*
 
 ## Real Container Example
 
@@ -544,21 +545,160 @@ Root inside container cannot:
   ```
 
 >**USER namespace** = “Root without real power”
+
 ---
 
-### CGROUP Namespace
+## CGROUP Namespace
 
-This isolates **cgroup visibility** so a container sees only its own resource limits.
+A **cgroup namespace** is a Linux kernel feature that **isolates the view of control groups (cgroups)** so that a process sees **only its own cgroup hierarchy**.
+
+**Problem Without cgroup namespace:**
+
+- Processes can see the **host’s entire cgroup tree**
+- Containers can discover host **resource layout**
+- Monitoring tools inside containers show **confusing host data**
 
 
-### TIME Namespace (Advanced)
+**What cgroup Namespace Does**
+
+- Each namespace sees a **virtualized cgroup path**
+- Processes see **only their own cgroup and children**
+- Host cgroup hierarchy is **hidden**
+
+Example:
+
+```
+Inside container:  /
+Host reality:      /sys/fs/cgroup/docker/<container-id>/
+```
+
+**Result (What You Actually Gain)**
+
+- Clean and simple **cgroup view** inside containers
+- Container tools report **correct resource limits**
+- Host resource structure remains **private**
+- Better isolation for monitoring and debugging
+
+**Key Rules**
+
+- **cgroup namespace does NOT enforce limits**
+  *It only hides the cgroup layout*\
+  *Actual limits are enforced by **cgroup controllers***
+
+- **Works with cgroup v2**
+  *Designed mainly for unified hierarchy*
+
+- **Usually enabled automatically**
+  *Docker, Podman, Kubernetes use it by default*
+
+- **Limit visibility, not control**
+  *Limits come from CPU, memory, IO controllers*
+
+
+## Real Container Example
+
+- Inside container:
+
+  ```
+  cat /proc/self/cgroup
+  → 0::/
+  ```
+
+- Host:
+
+  ```
+  /sys/fs/cgroup/docker/<container-id>/
+  ```
+
+
+**Commands to See It**
+
+- Check cgroup namespace:
+
+  ```bash
+  ls -l /proc/self/ns/cgroup
+  ```
+
+- View cgroup info:
+
+  ```bash
+  cat /proc/self/cgroup
+  ```
+
+>**cgroup namespace** = “Blindfold for resource hierarchy”
+
+---
+
+## TIME Namespace
+
+A **TIME namespace** is a Linux kernel feature that allows a process to see a **different system time offset** than the host.
 
 Allows:
 
 * Per-container system time offset
 * Useful for testing time-based apps
 
+---
+## What TIME Namespace Does
 
+With TIME namespace, a process can have:
+
+• A different **CLOCK_MONOTONIC**
+• A different **CLOCK_BOOTTIME**
+
+This means:
+
+* Uptime can look different
+* Timers can be offset
+* Time-based behavior can be tested
+
+⚠️ Important:
+
+* The real system clock is still shared
+* **It does NOT change real system time**
+* `date` usually shows the **host** time
+
+---
+
+## Why TIME Namespace Exists (Real Use Case)
+
+TIME namespace was created mainly for:
+
+• Testing time-sensitive applications
+• Simulating clock drift
+• Debugging timeout-related bugs
+• Running legacy software that depends on uptime
+
+It is **not** required for normal containers.
+
+---
+
+## Result (What You Actually Gain)
+
+• A process can think it started “earlier” or “later”
+• Uptime inside container can differ from host
+• Time-based bugs can be reproduced safely
+
+---
+
+## Key Rules (Important but Short)
+
+1. **TIME namespace does NOT change real system time**
+
+   * Host clock stays unchanged
+
+2. **Only monotonic clocks are affected**
+
+   * `date` usually shows host time
+
+3. **Rarely used in production**
+
+   * Mostly for testing and research
+
+4. **Requires modern kernel**
+
+   * Linux 5.6+
+---
 
 # cgroups
 
