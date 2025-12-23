@@ -159,7 +159,7 @@ Returns **detailed information** about one or more Docker networks. By default, 
   • Fully isolated network
 
 
-- ### 4.4 Inspect a Swarm overlay network
+- ### Inspect a Swarm overlay network
   
   ```bash
   docker network inspect my_overlay_net
