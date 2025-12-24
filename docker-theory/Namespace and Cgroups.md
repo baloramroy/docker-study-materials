@@ -631,36 +631,55 @@ Host reality:      /sys/fs/cgroup/docker/<container-id>/
 
 ## TIME Namespace
 
-A **TIME namespace** is a Linux kernel feature that allows a process to see a **different system time offset** than the host.
+A **TIME namespace** is a Linux kernel feature that allows a process to see a **different system time offset** than the **host**.
 
-Allows:
 
-* Per-container system time offset
-* Useful for testing time-based apps
+**Linux has two kinds of time:**
+- **Real time** → what you **see with date**
+- **Internal time counters** → used by programs to measure **how long something runs**
 
----
-## What TIME Namespace Does
+>TIME namespace touches only #2, never #1.
 
-With TIME namespace, a process can have:
 
-• A different **CLOCK_MONOTONIC**
-• A different **CLOCK_BOOTTIME**
+**What TIME Namespace Does**
+
+TIME namespace lets a process think:
+
+>“The system started earlier/later than it really did.”
+
+That’s it.
+Nothing more.
+
+So the process may think:
+- The system has been running for 10 hours
+- While the host has been running for 2 hours
 
 This means:
-
-* Uptime can look different
+* Uptime can look different than host
 * Timers can be offset
 * Time-based behavior can be tested
 
-⚠️ Important:
+With TIME namespace, a process can have:
 
-* The real system clock is still shared
-* **It does NOT change real system time**
-* `date` usually shows the **host** time
+- A different **CLOCK_MONOTONIC**\  
+  An internal clock that measures the time since the system was **booted**,
+  **without** the time when the system was **suspended**.
 
----
+- A different **CLOCK_BOOTTIME**\  
+  An internal clock that measures the time since the system was booted,
+  **including** the time spent in system **suspend**.
 
-## Why TIME Namespace Exists (Real Use Case)
+
+**What It Does NOT Do**
+
+- **TIME namespace does not change real system time**
+- It does not Change date
+- It does not Affect other processes
+- It does not Affect host time
+- `date` usually shows the **host** time
+
+
+**Why TIME Namespace Exists**
 
 TIME namespace was created mainly for:
 
@@ -671,33 +690,28 @@ TIME namespace was created mainly for:
 
 It is **not** required for normal containers.
 
----
 
-## Result (What You Actually Gain)
+**Result (What You Actually Gain)**
 
-• A process can think it started “earlier” or “later”
-• Uptime inside container can differ from host
-• Time-based bugs can be reproduced safely
+- A process can think it started “earlier” or “later”
+- Uptime inside container can differ from host
+- Time-based bugs can be reproduced safely
 
----
 
-## Key Rules (Important but Short)
+**Key Rules**
 
-1. **TIME namespace does NOT change real system time**
+- **TIME namespace does NOT change real system time**\
+  *Host clock stays unchanged*
 
-   * Host clock stays unchanged
+- **Only monotonic clocks are affected**\
+  *`date` usually shows host time*
 
-2. **Only monotonic clocks are affected**
+- **Rarely used in production**\
+  *Mostly for testing and research*
 
-   * `date` usually shows host time
+- **Requires modern kernel**\
+  *Linux 5.6+*
 
-3. **Rarely used in production**
-
-   * Mostly for testing and research
-
-4. **Requires modern kernel**
-
-   * Linux 5.6+
 ---
 
 # cgroups
