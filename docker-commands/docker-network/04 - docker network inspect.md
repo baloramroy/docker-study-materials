@@ -4,11 +4,10 @@
 
 Returns **detailed information** about one or more Docker networks. By default, output is rendered in **JSON format**. Useful for **debugging**, **validation**, and **deep network analysis**.
 
-- **Usage**
-
-  ```
-  docker network inspect [OPTIONS] NETWORK [NETWORK...]
-  ```
+**Usage**
+```
+docker network inspect [OPTIONS] NETWORK [NETWORK...]
+```
 
 ---
 
@@ -20,14 +19,14 @@ Returns **detailed information** about one or more Docker networks. By default, 
 docker network inspect my_network
 ```
 
-**Output Includes:**
-- Driver
-- Subnet and gateway
-- IPAM configuration
-- Connected containers and IPs
-- Labels and driver options
+_**Output Includes:**_
+- _Driver_
+- _Subnet and gateway_
+- _IPAM configuration_
+- _Connected containers and IPs_
+- _Labels and driver options_
 
-**Purpose:** Deep troubleshooting and network analysis
+_**Purpose:** Deep troubleshooting and network analysis_
 
 
 ### 1.2 Inspect more than one network at once
@@ -36,10 +35,8 @@ docker network inspect my_network
 docker network inspect bridge host
 ```
 
-**Output:**
-• JSON details for both networks\
-**Purpose:**
-• Compare configurations between networks
+_**Output:** • JSON details for both networks_\
+_**Purpose:** • Compare configurations between networks_
   
   
   
@@ -47,8 +44,8 @@ docker network inspect bridge host
 ```bash
 docker network inspect $(docker network ls -q | head -n 1)
 ```
-**Output:** • JSON details of the first network in the list\
-**Purpose:** • Useful in scripts and automation
+_**Output:** • JSON details of the first network in the list_\
+_**Purpose:** • Useful in scripts and automation_
 
 ---
 
@@ -60,10 +57,10 @@ docker network inspect $(docker network ls -q | head -n 1)
 docker network inspect --format '{{json .IPAM.Config}}' my_network
 ```
 
-**Output:**
+_**Output:**
 • Subnet
 • Gateway
-• IP range
+• IP range_
   
   
   
@@ -73,9 +70,9 @@ docker network inspect --format '{{json .IPAM.Config}}' my_network
 docker network inspect --format '{{json .Containers}}' my_network
 ```
 
-**Output:**
+_**Output:**
 • Container IDs
-• Assigned IP addresses
+• Assigned IP addresses_
 
 
 
@@ -85,7 +82,7 @@ docker network inspect --format '{{json .Containers}}' my_network
 docker network inspect --format '{{.Driver}}' my_network
 ```
 
-**Output:** Driver name (bridge, overlay, macvlan, etc.)
+_**Output:** Driver name (bridge, overlay, macvlan, etc.)_
 
 ---
 
@@ -97,7 +94,7 @@ docker network inspect --format '{{.Driver}}' my_network
 docker network inspect my_network | jq
 ```
 
-**Output:** Human‑readable formatted JSON
+_**Output:** Human‑readable formatted JSON_
   
   
 ### 3.2 Pretty‑print a specific field
@@ -106,7 +103,7 @@ docker network inspect my_network | jq
 docker network inspect my_network | jq '.[0].Containers'
 ```
 
-**Output:** Connected containers in readable format
+_**Output:** Connected containers in readable format_
 
 ---
 
@@ -118,10 +115,10 @@ docker network inspect my_network | jq '.[0].Containers'
 docker network inspect bridge
 ```
 
-**Output:**
-- Linux bridge (`docker0`)
-- Connected containers
-- IP range and options
+_**Output:**_
+- _Linux bridge (`docker0`)_
+- _Connected containers_
+- _IP range and options_
   
   
   
@@ -131,10 +128,8 @@ docker network inspect bridge
 docker network inspect host
 ```
 
-**Output:**
-• Host‑level networking details\
-**Note:**
-• Containers share the host network namespace
+_**Output:** • Host‑level networking details_\
+_**Note:** • Containers share the host network namespace_
   
   
 ### 4.3 Inspect the none network
@@ -143,8 +138,7 @@ docker network inspect host
 docker network inspect none
 ```
 
-**Output:**
-• Fully isolated network
+_**Output:** • Fully isolated network_
 
 
 ### 4.4 Inspect a Swarm overlay network
@@ -153,12 +147,12 @@ docker network inspect none
 docker network inspect my_overlay_net
 ```
 
-**Output Includes:**
-- Swarm scope
-- Peers (nodes)
-- Subnets and VXLAN details
+_**Output Includes:**_
+- _Swarm scope_
+- _Peers (nodes)_
+- _Subnets and VXLAN details_
 
-**Requirement:** Docker Swarm mode must be enabled
+_**Requirement:** Docker Swarm mode must be enabled_
 
 ---
 
@@ -171,10 +165,8 @@ docker network inspect \
   $(docker container inspect -f '{{json .NetworkSettings.Networks}}' webapp)
 ```
 
-**Output:**
-• All networks attached to container `webapp`\
-**Purpose:**
-• Identify container‑to‑network relationships
+_**Output:** • All networks attached to container `webapp`_\
+_**Purpose:** • Identify container‑to‑network relationships_
 
 ---
 
