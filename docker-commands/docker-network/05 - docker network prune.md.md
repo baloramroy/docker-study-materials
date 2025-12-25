@@ -1,4 +1,4 @@
-## `docker network prune`
+# `docker network prune`
 
 ## Description
 
