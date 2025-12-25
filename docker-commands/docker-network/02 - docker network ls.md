@@ -5,136 +5,135 @@
 
 Lists all the networks the Engine **daemon** knows about. This includes the networks that span across **multiple hosts** in a cluster.
 
-- Usage
+- **Usage**
   ```
   docker network ls [OPTIONS]
   ```
 
-- Aliases
+- **Aliases**
   ```
   docker network list
   ```
 
-#
+---
 
-### List All Networks
+### 1. List All Networks
 
-- List all available Docker networks
+**1.1 List all available Docker networks**
 
-  ```
-  docker network ls
-  ```
+```bash
+docker network ls
+```
 
-  > **Output:** Shows all networks including bridge, host, none, and user-defined networks.
+_**Output:** Shows all networks including bridge, host, none, and user-defined networks._
 
-#
+---
 
-### Filter by Network Name
+### 2. Filter by Network Name
 
-- List networks matching a name
+**2.1 List networks matching a name**
 
-  ```
-  docker network ls --filter "name=prod"
-  ```
-  
-  > **Output:** Shows networks whose names contain `prod`.
+```bash
+docker network ls --filter "name=prod"
+```
 
-#
+_**Output:** Shows networks whose names contain `prod`._
 
-### Filter by Driver
+---
 
-- List only **bridge** networks
+### 3. Filter by Driver
 
-  ```
-  docker network ls --filter "driver=bridge"
-  ```
-  
-  > **Output:** Displays networks using the bridge driver.
+**3.1 List only **bridge** networks**
 
-- List only overlay networks
+```bash
+docker network ls --filter "driver=bridge"
+```
 
-  ```
-  docker network ls --filter "driver=overlay"
-  ```
-  
-  > **Output:** Displays overlay networks (common in Swarm/Kubernetes).
+_**Output:** Displays networks using the bridge driver._
 
-#
 
-### Filter by Scope
+**3.2 List only overlay networks**
 
-- List only local-scope networks
+```bash
+docker network ls --filter "driver=overlay"
+```
 
-  ```
-  docker network ls --filter "scope=local"
-  ```
-  
-  > **Output:** Shows networks limited to a single node.
-  
-  > **purpose:** Identify networks not shared across clusters.
-
-- List only swarm-scope networks
-
-  ```
-  docker network ls --filter "scope=swarm"
-  ```
-  
-  > **Output:** Shows multi-node Swarm networks.
+_**Output:** Displays overlay networks (common in Swarm/Kubernetes)._
 
 #
 
-### Filter by Network Type (Built-in vs User-Defined)
+### 4. Filter by Scope
 
-- List only built-in networks
+**4.1 List only local-scope networks**
 
-  ```
-  docker network ls --filter "type=builtin"
-  ```
-  
-  > **Output:** Shows bridge, host, and none.
-  
-  > **purpose:** Quickly identify default networks.
+```bash
+docker network ls --filter "scope=local"
+```
 
-- List only user-created networks
+_**Output:** Shows networks limited to a single node._\
+_**purpose:** Identify networks not shared across clusters._
 
-  ```
-  docker network ls --filter "type=custom"
-  ```
-  
-  > **Output:** Displays networks created by admins or apps.
 
-#
+**4.2 List only swarm-scope networks**
 
-### Display Only Network IDs
+```bash
+docker network ls --filter "scope=swarm"
+```
 
-- List only network IDs
+_**Output:** Shows multi-node Swarm networks._
 
-  ```
-  docker network ls -q
-  ```
-  
-  > **Output:** Shows only IDs of all networks.
-  
-  > **purpose:** Useful for bulk removal or scripting.
+---
 
-- Example: remove all unused custom networks
+### 5. Filter by Network Type (Built-in vs User-Defined)
 
-  ```
-  docker network rm $(docker network ls -q)
-  ```
+**5.1 List only built-in networks**
 
-  > **Output:** Removes all networks (except those in use).
+```bash
+docker network ls --filter "type=builtin"
+```
 
-#
+_**Output:** Shows bridge, host, and none._\
+_**purpose:** Quickly identify default networks._
 
-### Combining Multiple Filters
 
-- Filter networks by name + driver
+**5.2 List only user-created networks**
 
-  ```
-  docker network ls --filter "name=web" --filter "driver=bridge"
-  ```
-  
-  > **Output:** Shows only bridge networks whose name contains `web`.
+```bash
+docker network ls --filter "type=custom"
+```
 
-#
+_**Output:** Displays networks created by admins or apps._
+
+---
+
+### 6. Display Only Network IDs
+
+**6.1 List only network IDs**
+```bash
+docker network ls -q
+```
+
+_**Output:** Shows only IDs of all networks._\
+_**purpose:** Useful for bulk removal or scripting._
+
+
+**6.2 Example: Remove all unused custom networks**
+```
+docker network rm $(docker network ls -q)
+```
+
+_**Output:** Removes all networks (except those in use)._
+
+---
+
+### 7. Combining Multiple Filters
+
+**7.1 Filter networks by name + driver**
+
+```bash
+docker network ls --filter "name=web" --filter "driver=bridge"
+```
+
+_**Output:** Shows only bridge networks whose name contains `web`._
+
+---
