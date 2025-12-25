@@ -1,10 +1,10 @@
 
-# Linux Namespaces and cgroups
+# Linux Namespaces and CGroups
 
-**First, Understand the Core Idea**
+### First, Understand the Core Idea
 
 Before namespaces and cgroups, Linux had only **processes**.
-
+#
 **All processes could:**
 * See each other
 * Compete freely for CPU and memory
@@ -13,8 +13,8 @@ Before namespaces and cgroups, Linux had only **processes**.
 
 This was **not safe**, **not isolated**, and **not scalable**.
 
-
-Linux solved this with **two kernel features**:
+#
+**Linux solved this with two kernel features**:
 
 1. **Namespaces** → *Isolation (What a process only can see)*
 2. **cgroups** → *Resource control (What a process only  can use)*
