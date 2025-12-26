@@ -1,4 +1,5 @@
-# `docker network disconnect`
+`docker network disconnect`
+# Docker Network Disconnect
 
 ## Description
 Disconnects a container from a network. The container must be running to disconnect it from the network.

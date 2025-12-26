@@ -1,4 +1,5 @@
-# `docker network rm`
+`docker network rm`
+# Docker Network Rm
 
 ## Description
 **Removes** one or more **networks** by **name or identifier**. To remove a network, you must first **disconnect** any containers connected to it.

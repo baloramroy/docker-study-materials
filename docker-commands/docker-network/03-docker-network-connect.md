@@ -1,6 +1,5 @@
-
-# `docker network connect`
-
+`docker network connect`
+# Docker Network Connect
 ## 1. Description
 
 * Connects an **container (running or stopped)** to an **existing Docker network**

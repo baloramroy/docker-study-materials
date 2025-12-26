@@ -1,6 +1,10 @@
 `docker volume ls`
 # docker volume ls
 
+## Description
+
+**List all the volumes known to Docker**. You can **filter** using the `-f` or `--filter` flag. Refer to the filtering section for more information about available filter options.
+
 **Usage**
 ```bash
 docker volume ls [OPTIONS]
@@ -9,9 +13,6 @@ docker volume ls [OPTIONS]
 ```
 docker volume list
 ```
-
-## Description
-**List all the volumes known to Docker**. You can **filter** using the `-f` or `--filter` flag. Refer to the filtering section for more information about available filter options.
 
 ---
 
