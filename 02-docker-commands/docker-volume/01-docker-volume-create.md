@@ -136,13 +136,13 @@ docker volume create --name backup_data
 
 ---
 
-## 6. Best Practices
+## Best Practices
 
-• Use **labels** for environment, application, and ownership
-• Prefer **named volumes** over anonymous volumes
-• Use **bind-backed volumes** only when strict host control is needed
-• Separate **database volumes** from application data
-• Avoid deleting volumes without inspection in **production**
+- Use **labels** for environment, application, and ownership
+- Prefer **named volumes** over anonymous volumes
+- Use **bind-backed volumes** only when strict host control is needed
+- Separate **database volumes** from application data
+- Avoid deleting volumes without inspection in **production**
 
 ---
 
