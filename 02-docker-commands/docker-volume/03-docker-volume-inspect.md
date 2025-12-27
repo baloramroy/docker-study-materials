@@ -1,12 +1,6 @@
 `docker volume inspect`
 # docker volume inspect
 
-**Usage**
-
-```bash
-docker volume inspect [OPTIONS] VOLUME [VOLUME...]
-```
-
 ## Description
 
 Displays **detailed low-level information** about one or more Docker volumes in **JSON format**.
@@ -16,6 +10,12 @@ This command is commonly used by **system administrators and DevOps engineers** 
 - Verify **volume driver, scope, and labels**
 - Troubleshoot **storage-related container issues**
 - Extract specific metadata using formatted output
+
+**Usage**
+
+```bash
+docker volume inspect [OPTIONS] VOLUME [VOLUME...]
+```
 
 ---
 
