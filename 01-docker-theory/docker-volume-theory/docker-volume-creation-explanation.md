@@ -1,9 +1,6 @@
+# Understanding `docker volume create`
 
----
-
-# Understanding `docker volume create` (Advanced Options)
-
-## 1. Big Picture (Very Important)
+## Big Picture (Very Important)
 
 When you run:
 
@@ -13,15 +10,14 @@ docker volume create --driver local --opt ...
 
 You are basically telling Docker:
 
-> “Docker, **use Linux mount mechanisms** to attach some storage
-> and manage it **as a Docker volume**.”
+- “Docker, **use Linux mount mechanisms** to attach some storage and manage it **as a Docker volume**.”
 
 _**Key truth:**\
 Docker volumes are **not magic storage** — they are wrappers around **Linux mounts**._
 
 ---
 
-## 2. What is `--driver local`?
+## 1. What is `--driver local`?
 
 **Meaning**
 
@@ -33,33 +29,30 @@ Docker volumes are **not magic storage** — they are wrappers around **Linux mo
 - Internally relies on **Linux mount system calls**
 - No external plugin needed
 
-**In simple words**
-
-> “Use the host machine’s local storage and mounting capabilities.”
+**In simple words**\
+“Use the host machine’s local storage and mounting capabilities.”
 
 **Real Linux analogy**
 
-Same as running:
+Same as running `mount` command on the **host**, but **Docker does it for you**.
 
 ```bash
 mount ...
 ```
 
-on the **host**, but **Docker does it for you**.
-
 ---
 
-## 3. What is `--opt`?
+## 2. What is options,`--opt`?
 
 `--opt` means:
+- Pass **mount options** to the volume driver.
+- Docker forwards these options **directly to the Linux mount command**.
 
-> “Pass **mount options** to the volume driver.”
 
-Docker forwards these options **directly to the Linux mount command**.
+### 2.1 Understanding Options `type`
 
----
-
-## 4. Understanding `type`
+**Meaning:**\
+`type` = **filesystem type**
 
 **Example**
 
@@ -79,14 +72,10 @@ or
 --opt type=nfs
 ```
 
-**Meaning:**
-
-`type` = **filesystem type**
-
 **Linux equivalent:**
 
 ```bash
-mount -t <type> ...
+mount -t ext4 /source/path /destination/path
 ```
 
 **Common values**
@@ -100,33 +89,34 @@ mount -t <type> ...
 
 ---
 
-## 5. Understanding `device`
+### 2.2 Understanding Options `device`
 
-**Example**
+**Meaning**\
+`device` = **what you want to mount**
+
+**Example:**
 
 ```bash
 --opt device=/data/app
 ```
+or
 
 ```bash
 --opt device=/dev/sdb1
 ```
+or
 
 ```bash
 --opt device=:/exports/docker
 ```
 
-**Meaning**
-
-`device` = **what you want to mount**
-
-**Linux equivalent**
+**Linux equivalent:**
 
 ```bash
-mount <device> <mount_point>
+mount /dev/sdb1 /mount/point
 ```
 
-**Examples mapped**
+**Examples mapped:**
 
 | device value       | Meaning         |
 | ------------------ | --------------- |
@@ -136,26 +126,27 @@ mount <device> <mount_point>
 
 ---
 
-## 6. Understanding `o` (options)
+## 2.3 Understanding Options `o` (o means options)
+
+**Meaning**\
+`o` = **mount options**
 
 **Example**
 
 ```bash
 --opt o=bind
 ```
+or
 
 ```bash
 --opt o=addr=192.168.1.10,rw
 ```
 
-**Meaning**
-
-`o` = **mount options**
-
-**Linux equivalent**
+**Linux equivalent:**
 
 ```bash
-mount -o <options>
+mount -o bind /source/path /destination/path
+mount -t nfs -o rw 192.168.1.10:/export/path /mount/point
 ```
 
 **Common options**
@@ -170,9 +161,9 @@ mount -o <options>
 
 ---
 
-## 7. Now Let’s Decode Each Example Completely
+## 3. Now Let’s Decode Each Example Completely
 
-### Example 1: Bind Mount Volume
+### 3.1 Bind Mount Docker Volume
 
 ```bash
 docker volume create \
@@ -183,12 +174,11 @@ docker volume create \
   app_bind_volume
 ```
 
-**What Docker does internally**
-
+**What Docker does internally**\
 Equivalent Linux command:
 
 ```bash
-mount --bind /data/app /var/lib/docker/volumes/app_bind_volume/_data
+mount -o bind /data/app /var/lib/docker/volumes/app_bind_volume/_data
 ```
 
 **Explanation**
@@ -207,7 +197,7 @@ mount --bind /data/app /var/lib/docker/volumes/app_bind_volume/_data
 
 ---
 
-### Example 2: Block Device Volume
+### 3.2 Block Device Volume
 
 ```bash
 docker volume create \
@@ -238,7 +228,7 @@ mount -t ext4 /dev/sdb1 /var/lib/docker/volumes/db_storage/_data
 
 ---
 
-### Example 3: NFS Volume
+### 3.3 NFS Volume
 
 ```bash
 docker volume create \
@@ -252,7 +242,7 @@ docker volume create \
 **Internal Linux command**
 
 ```bash
-mount -t nfs 192.168.1.10:/exports/docker \
+mount -t nfs -o rw,addr=192.168.1.10:/exports/docker \
   /var/lib/docker/volumes/nfs_volume/_data
 ```
 
