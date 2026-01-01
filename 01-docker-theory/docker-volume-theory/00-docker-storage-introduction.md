@@ -40,7 +40,7 @@ Docker has **two** types of storage concepts,
   This includes **read-only image layers** and the **container’s temporary writable layer**, but not **persistent volume data**.
 
 - **Container Filesystem**\
-  The container filesystem is the layered, temporary filesystem created from **image layers** and a **writable layer** that the container uses while running.
+  The container filesystem is the **layered**, **temporary filesystem** created from **image layers** and a **writable layer** that the container uses while running.
 
   Example directories:\
   `/bin`, `/etc`, `/usr`, `/var`, `/app`

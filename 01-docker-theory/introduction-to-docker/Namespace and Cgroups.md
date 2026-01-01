@@ -683,10 +683,10 @@ With TIME namespace, a process can have:
 
 TIME namespace was created mainly for:
 
-• Testing time-sensitive applications
-• Simulating clock drift
-• Debugging timeout-related bugs
-• Running legacy software that depends on uptime
+- Testing time-sensitive applications
+- Simulating clock drift
+- Debugging timeout-related bugs
+- Running legacy software that depends on uptime
 
 It is **not** required for normal containers.
 
@@ -714,17 +714,14 @@ It is **not** required for normal containers.
 
 ---
 
-# cgroups
+## cgroups
 
-## What Is a cgroup?
+### What Is a cgroup?
 
 A **control group (cgroup)** is a Linux kernel feature that **limits, accounts, and prioritizes** `resources` for a **group of processes**.
 
-Namespaces say:
-* “What you can see”
-
-cgroups say:
-* “What you can use”
+- **Namespaces say:** *“What you can see”*
+- **cgroups say:** *“What you can use”*
 
 
 ## What Resources cgroups Control

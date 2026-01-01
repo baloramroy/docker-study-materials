@@ -63,7 +63,7 @@ docker run \
 
 ---
 
-## 1.2 Bind Mount Using `--mount`
+### 1.2 Bind Mount Using `--mount`
 
 - **Basic Bind Mount**
 
