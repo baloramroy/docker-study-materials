@@ -30,6 +30,7 @@ environment:
 - `APP_PORT=8080` → set inside container
 - `ENABLE_CACHE=true` → quoted so YAML does **not** treat it as boolean
 
+#
 
 **1.1.2 Host-Provided Variable Example**
 
@@ -53,7 +54,7 @@ If not exported → `API_TOKEN` will **not** exist inside the container.
 
 ---
 
-### 1.2 ARRAY FORMAT
+### 1.2 Array Format
 
 **1.2.1 NGINX Example**
 
@@ -69,7 +70,7 @@ environment:
 - `APP_PORT=8080` → set inside container
 - `ENABLE_CACHE=true` → quoted so YAML does **not** treat it as boolean
 
-
+#
 
 **1.2.2 Host Variable Example**
 
@@ -93,7 +94,8 @@ environment:
 ## 2. Using `env_file:`
 You can keep environment variables in a separate `.env` file.
 
-### **Example:**
+### 2.1 Single Env File Example
+
 **webapp.env**
 ```env
 DEBUG=true
@@ -111,7 +113,7 @@ services:
 - Works with `docker run --env-file`
 - Keeps sensitive variables outside YAML (better organization)
 
-**Multiple env files:**
+### 2.2 Multiple env files
 ```yaml
 env_file:
   - default.env
@@ -119,7 +121,7 @@ env_file:
 ```
 >Later files override earlier ones.
 
-**Optional env files (Compose ≥ 2.24.0)**
+### 2.3 Optional env files (Compose ≥ 2.24.0)
 ```yaml
 env_file:
   - path: ./default.env
@@ -141,3 +143,5 @@ Or pass from your shell:
 ```bash
 docker compose run -e DEBUG web python console.py
 ```
+
+---
