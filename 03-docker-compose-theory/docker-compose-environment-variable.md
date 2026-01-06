@@ -30,7 +30,6 @@ environment:
 - `APP_PORT=8080` → set inside container
 - `ENABLE_CACHE=true` → quoted so YAML does **not** treat it as boolean
 
----
 
 **1.1.2 Host-Provided Variable Example**
 
@@ -70,7 +69,7 @@ environment:
 - `APP_PORT=8080` → set inside container
 - `ENABLE_CACHE=true` → quoted so YAML does **not** treat it as boolean
 
----
+
 
 **1.2.2 Host Variable Example**
 
@@ -129,6 +128,8 @@ env_file:
     required: false
 ```
 >If `override.env` is missing, no error.
+
+---
 
 ## 3. Set environment variables at runtime
 You can pass them only when running a service:
