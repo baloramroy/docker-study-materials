@@ -2,7 +2,7 @@
 
 ## Objective
 
-Install Docker Engine, configure it to start automatically, verify the installation, and perform basic post-installation tasks.
+Install **Docker** Engine, configure it to **start automatically**, **verify** the installation, and perform basic **post-installation** tasks.
 
 ---
 
@@ -11,8 +11,8 @@ Install Docker Engine, configure it to start automatically, verify the installat
 Before beginning, ensure:
 
 * Root or `sudo` privileges are available.
-* The system has internet connectivity.
-* Old Docker packages (if any) are removed.
+* The system has **internet** connectivity.
+* **Old Docker** packages (if any) are **removed**.
 * `dnf` or `yum` package manager is available.
 
 ## System Preparation
@@ -120,7 +120,7 @@ Before beginning, ensure:
 
 ### Install Docker Engine
 
-- Run
+- Run and install all of this packages:
 
   ```bash
   dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
@@ -232,7 +232,7 @@ Before beginning, ensure:
 
 ---
 
-## Allow a Non-Root User to Run Docker
+## Allow a `Non-Root` User to Run Docker
 
 - Create the Docker group if `docker` group doesn't exist:
 
@@ -257,6 +257,30 @@ Before beginning, ensure:
   ```bash
   docker run hello-world
   ```
+
+---
+
+## Lock Docker Packages:
+
+- Command:
+
+  ```bash
+  dnf versionlock add \
+  docker-ce \
+  docker-ce-cli \
+  containerd.io \
+  docker-compose-plugin \
+  docker-buildx-plugin \
+  docker-ce-rootless-extras
+  ```
+
+- Check the version lock list
+  
+  ```bash
+  dnf versionlock list
+  ```
+
+  > **N.B: Then log out and log in again.**
 
 ---
 
@@ -329,11 +353,13 @@ Before beginning, ensure:
 
   > Then log out and log back in (or use `newgrp docker`).
 
-## Check installed Docker packages
+### Check installed Docker packages
 
-```bash
-rpm -qa | grep docker
-```
+- Run
+
+  ```bash
+  rpm -qa | grep docker
+  ```
 
 ---
 
