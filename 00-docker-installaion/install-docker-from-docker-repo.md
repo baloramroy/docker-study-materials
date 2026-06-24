@@ -122,308 +122,212 @@ Before beginning, ensure:
 
 - Run
 
-```bash
-dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-```
+  ```bash
+  dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  ```
 
-If prompted to accept the GPG key:
+- If prompted to accept the GPG key:
 
-```
-Is this ok [y/N]:
-```
+  ```
+  Is this ok [y/N]:
+  ```
 
-Type:
+- Type:
 
-```
-y
-```
-
----
-
-# Step 6: Start Docker Service
-
-```bash
-sudo systemctl start docker
-```
-
-Verify:
-
-```bash
-sudo systemctl status docker
-```
-
-Expected:
-
-```text
-Active: active (running)
-```
+  ```
+  y
+  ```
 
 ---
 
-# Step 7: Enable Docker at Boot
+## Docker Service Management
 
-```bash
-sudo systemctl enable docker
-```
+### Start Docker Service
 
-Verify:
+- Run
+  
+  ```bash
+  systemctl start docker
+  ```
 
-```bash
-sudo systemctl is-enabled docker
-```
+- Verify:
 
-Expected:
+  ```bash
+  systemctl status docker
+  ```
 
-```text
-enabled
-```
+- Expected:
 
----
+  ```text
+  Active: active (running)
+  ```
 
-# Step 8: Verify Docker Version
+#
 
-```bash
-docker --version
-```
+### Enable Docker at Boot
 
-Example:
+- Run
 
-```text
-Docker version 28.x.x
-```
+  ```bash
+  systemctl enable docker
+  ```
 
----
+- Verify:
 
-# Step 9: Verify Docker Can Communicate with the Daemon
+  ```bash
+  systemctl is-enabled docker
+  ```
 
-```bash
-sudo docker info
-```
+- Expected:
 
-This should display server information without errors.
+  ```text
+  enabled
+  ```
 
----
+#
 
-# Step 10: Run the Test Container
+### Verify Docker Version
 
-```bash
-sudo docker run hello-world
-```
+- Run
 
-Expected output includes:
+  ```bash
+  docker --version
+  ```
 
-```text
-Hello from Docker!
-```
+- Example:
 
-This confirms Docker is functioning correctly.
+  ```text
+  Docker version 28.x.x
+  ```
 
----
+#
 
-# Step 11: Allow a Non-Root User to Run Docker (Optional)
+### Verify Docker Can Communicate with the Daemon
 
-Create the Docker group if necessary:
+- Run
 
-```bash
-sudo groupadd docker
-```
+  ```bash
+  docker info
+  ```
 
-Add your user:
-
-```bash
-sudo usermod -aG docker $USER
-```
-
-Apply the new group membership by logging out and back in, or start a new login shell:
-
-```bash
-newgrp docker
-```
-
-Test without `sudo`:
-
-```bash
-docker run hello-world
-```
+  >This should display server information without errors.
 
 ---
 
-# Step 12: Check Docker Service
+##  Run the Test Container
 
-```bash
-systemctl status docker
-```
+- Run
 
-Check the version:
+  ```bash
+  docker run hello-world
+  ```
 
-```bash
-docker version
-```
+- Expected output includes:
 
-List running containers:
+  ```text
+  Hello from Docker!
+  ```
 
-```bash
-docker ps
-```
-
-List all containers:
-
-```bash
-docker ps -a
-```
-
-List downloaded images:
-
-```bash
-docker images
-```
+  > This confirms Docker is functioning correctly.
 
 ---
 
-# Step 13: Configure Firewall (If Exposing Container Ports)
+## Allow a Non-Root User to Run Docker
 
-Example: allow HTTP traffic.
+- Create the Docker group if `docker` group doesn't exist:
 
-```bash
-sudo firewall-cmd --permanent --add-service=http
-sudo firewall-cmd --reload
-```
+  ```bash
+  sudo groupadd docker
+  ```
 
-For a custom application port (example: `8080`):
+- Add your user:
 
-```bash
-sudo firewall-cmd --permanent --add-port=8080/tcp
-sudo firewall-cmd --reload
-```
+  ```bash
+  sudo usermod -aG docker $USER
+  ```
 
-Verify:
+- Apply the new group membership by logging out and back in, or start a new login shell:
 
-```bash
-sudo firewall-cmd --list-all
-```
+  ```bash
+  newgrp docker
+  ```
 
----
+- Test without `sudo`:
 
-# Step 14: Useful Docker Service Commands
-
-Start Docker:
-
-```bash
-sudo systemctl start docker
-```
-
-Stop Docker:
-
-```bash
-sudo systemctl stop docker
-```
-
-Restart Docker:
-
-```bash
-sudo systemctl restart docker
-```
-
-Reload configuration:
-
-```bash
-sudo systemctl reload docker
-```
-
-Enable at boot:
-
-```bash
-sudo systemctl enable docker
-```
-
-Disable at boot:
-
-```bash
-sudo systemctl disable docker
-```
-
-Check status:
-
-```bash
-sudo systemctl status docker
-```
+  ```bash
+  docker run hello-world
+  ```
 
 ---
 
-# Step 15: Basic Docker Validation
+## Check Docker Service
 
-Check Docker version:
+- Run to check status
 
-```bash
-docker version
-```
+  ```bash
+  systemctl status docker
+  ```
 
-Check Docker information:
+- Check the version:
 
-```bash
-docker info
-```
+  ```bash
+  docker version
+  ```
 
-List images:
+- List running containers:
 
-```bash
-docker images
-```
+  ```bash
+  docker ps
+  ```
 
-List running containers:
+- List all containers:
 
-```bash
-docker ps
-```
+  ```bash
+  docker ps -a
+  ```
 
-Run an interactive container:
+- List downloaded images:
 
-```bash
-docker run -it alpine sh
-```
-
-Exit the container:
-
-```sh
-exit
-```
+  ```bash
+  docker images
+  ```
 
 ---
 
-# Troubleshooting
+## Troubleshooting
 
-## Repository not found
+### Repository not found
 
-Clean metadata and rebuild the cache:
+- Clean metadata and rebuild the cache:
 
-```bash
-sudo dnf clean all
-sudo dnf makecache
-```
+  ```bash
+  sudo dnf clean all
+  sudo dnf makecache
+  ```
 
-## Docker service fails to start
+### Docker service fails to start
 
-Inspect logs:
+- Inspect logs:
 
-```bash
-sudo journalctl -u docker -xe
-```
+  ```bash
+  journalctl -u docker -xe
+  ```
 
-## Permission denied when running `docker`
+### Permission denied when running `docker`
 
-Verify group membership:
+- Verify group membership:
 
-```bash
-groups
-```
+  ```bash
+  groups
+  ```
 
-If `docker` is not listed, reapply:
+- If `docker` is not listed, reapply:
 
-```bash
-sudo usermod -aG docker $USER
-```
+  ```bash
+  sudo usermod -aG docker $USER
+  ```
 
-Then log out and log back in (or use `newgrp docker`).
+  > Then log out and log back in (or use `newgrp docker`).
 
 ## Check installed Docker packages
 
@@ -433,15 +337,7 @@ rpm -qa | grep docker
 
 ---
 
-# Installation Verification Checklist
+>[!NOTE]
+This procedure provides a **clean**, **repeatable** installation suitable for **lab and production** environments on supported **RHEL and CentOS** systems.
 
-| Check             | Command                       | Expected Result          |
-| ----------------- | ----------------------------- | ------------------------ |
-| Docker installed  | `docker --version`            | Version displayed        |
-| Service running   | `systemctl status docker`     | `active (running)`       |
-| Starts on boot    | `systemctl is-enabled docker` | `enabled`                |
-| Daemon accessible | `docker info`                 | Server information shown |
-| Test container    | `docker run hello-world`      | Success message printed  |
-| Compose plugin    | `docker compose version`      | Version displayed        |
-
-This procedure provides a clean, repeatable installation suitable for lab and production environments on supported RHEL and CentOS systems.
+---
