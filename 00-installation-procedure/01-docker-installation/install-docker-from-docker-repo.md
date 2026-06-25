@@ -88,6 +88,14 @@ Before beginning, ensure:
 
   > `dnf-plugins-core` package provides the commands to manage your DNF repositories.
 
+- Install version lock:
+  
+  ```bash
+  dnf install python3-dnf-plugin-versionlock
+  or
+  dnf install 'dnf-command(versionlock)'
+  ```
+
 #
 
 ### Add the Official Docker Repository
@@ -237,13 +245,13 @@ Before beginning, ensure:
 - Create the Docker group if `docker` group doesn't exist:
 
   ```bash
-  sudo groupadd docker
+  groupadd docker
   ```
 
 - Add your user:
 
   ```bash
-  sudo usermod -aG docker $USER
+  usermod -aG docker $USER
   ```
 
 - Apply the new group membership by logging out and back in, or start a new login shell:
