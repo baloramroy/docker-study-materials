@@ -1,258 +1,228 @@
-Absolutely. We’ll **start Phase 1 and stay strictly in the roadmap order** from your project source. I’ll use the uploaded **Docker Image Building Guide** as the primary source and won’t jump ahead into later topics unless needed to explain the current concept. 
+# Phase 1 — Part 1: Container vs Image
 
-# Phase 1 — Docker Fundamentals
-
-The eight topics are:
-
-1. **Container vs Image** ← **we start here**
-2. Dockerfile
-3. Build context
-4. Docker image layers
-5. Docker image registry
-6. Container filesystem
-7. Base images
-8. Image tags
-
-The goal of Phase 1 is not to memorize Docker commands. It is to build the mental model needed to eventually understand:
-
-> **What exactly happens when I run `docker build`?** 
-
----
-
-# 1. Container vs Image
-
-This is probably the **most important Docker concept to get right first**.
-
-A simple way to think about it is:
+We will stay **strictly in roadmap order** and will not go deeply into Dockerfile, layers, filesystem, registry, or other later concepts yet.
 
 ```text
-IMAGE
-  │
-  │ creates/runs
-  ▼
-CONTAINER
+Phase 1 — Docker Fundamentals
+
+1.  Container vs Image       ← NOW
+2.  Dockerfile
+3.  Build context
+4.  Docker image layers
+5.  Docker image registry
+6.  Container filesystem
+7.  Base images
+8.  Image tags
 ```
 
-An **image** is the packaged thing.
+The goal of this topic is to build one foundational mental model:
 
-A **container** is a running instance of that packaged thing.
+> **What is a Docker image, what is a Docker container, and how are they related?**
 
 ---
 
-## 1.1 What is a Docker Image?
+# 1. Start With the Simplest Mental Model
 
-A Docker **image** is a packaged filesystem and configuration that Docker can use to create containers.
+The most important relationship is:
 
-For example, imagine you have a Python application:
+```text
+Docker Image
+     │
+     │ used to create
+     ▼
+Docker Container
+```
+
+Or even shorter:
+
+```text
+Image → Container
+```
+
+Think of it this way:
+
+> **Image = packaged artifact**
+> **Container = running instance of that artifact**
+
+This distinction will appear throughout everything we learn later.
+
+---
+
+# 2. What Is a Docker Image?
+
+A **Docker image** is a packaged artifact that contains the filesystem content and configuration needed to create a container.
+
+For example, imagine an application:
 
 ```text
 my-app/
 ├── app.py
-├── requirements.txt
-└── Dockerfile
+└── requirements.txt
 ```
 
-Eventually, you build this into an image:
-
-```text
-my-app source code
-       │
-       │ docker build
-       ▼
-   Docker Image
-```
-
-The image contains what is needed to create the application environment.
+Eventually, we can build an image containing the application's required environment.
 
 Conceptually:
 
 ```text
 ┌──────────────────────────────┐
-│       Docker Image           │
+│        Docker Image          │
 │                              │
-│  Application code            │
-│  Dependencies                │
+│  Application files           │
 │  Runtime                     │
-│  Filesystem                  │
-│  Configuration               │
+│  Dependencies                │
+│  Filesystem content          │
+│  Configuration / metadata    │
 │                              │
 └──────────────────────────────┘
 ```
 
-The image itself is **not the running application**.
+The important thing is:
 
-That's the key distinction.
+> **The image is the packaged artifact.**
+
+It is not the running application.
 
 ---
 
-# 1.2 What is a Container?
+# 3. What Is a Container?
 
-A **container** is an instance created from an image.
-
-Think:
-
-```text
-             IMAGE
-               │
-        ┌──────┴──────┐
-        ▼             ▼
-   Container A   Container B
-```
-
-You can create multiple containers from the same image.
+A **container** is an isolated runtime environment created from a Docker image.
 
 For example:
 
 ```text
-              my-app:1.0
-                  │
-        ┌─────────┼─────────┐
-        ▼         ▼         ▼
-    Container  Container  Container
-       #1          #2          #3
+              Docker Image
+                   │
+          ┌────────┼────────┐
+          │        │        │
+          ▼        ▼        ▼
+      Container Container Container
+         #1         #2         #3
 ```
 
-All three containers can originate from the same image.
-
-This is one of the fundamental ideas behind containers.
-
----
-
-# 1.3 An analogy
-
-Imagine a **class** and an **object** in programming.
-
-```text
-Class
- │
- ├── Object 1
- ├── Object 2
- └── Object 3
-```
-
-The class defines what the objects are based on.
-
-Similarly:
-
-```text
-Docker Image
- │
- ├── Container 1
- ├── Container 2
- └── Container 3
-```
-
-The image provides the basis from which containers are created.
-
-It's not a perfect analogy, but it's useful for the initial mental model.
-
----
-
-# 1.4 Another analogy: ISO vs running computer
-
-You can also think of an image somewhat like an installation artifact.
+All three containers can be created from the same image.
 
 For example:
 
 ```text
-Ubuntu ISO
-     │
-     ▼
-Installed Ubuntu system
+my-app:1.0
+    │
+    ├── container-1
+    ├── container-2
+    └── container-3
 ```
 
-Similarly:
+The image provides the packaged starting point.
 
-```text
-Docker Image
-     │
-     ▼
-Docker Container
-```
-
-But don't take this analogy too literally.
-
-A Docker image isn't simply an ISO file, and a container isn't a traditional virtual machine.
-
-We'll build the more precise model later.
+Each container is a separate runtime instance.
 
 ---
 
-# 1.5 Image vs Container
+# 4. Image vs Container — The Core Difference
 
 Let's make the distinction very explicit.
 
-| Image                            | Container                                  |
-| -------------------------------- | ------------------------------------------ |
-| Packaged artifact                | Instance created from an image             |
-| Used as the basis for containers | Runs the application                       |
-| Generally immutable              | Has a writable runtime layer               |
-| Can create many containers       | Represents a particular container instance |
-| Can be stored in a registry      | Can be started/stopped/removed             |
+| Docker Image                 | Docker Container                   |
+| ---------------------------- | ---------------------------------- |
+| Packaged artifact            | Runtime instance                   |
+| Used to create containers    | Created from an image              |
+| Usually treated as immutable | Has a writable runtime layer       |
+| Can be stored/distributed    | Can be started/stopped/removed     |
+| Can create many containers   | Represents one particular instance |
 
 The most important relationship is:
 
 ```text
-             Docker Image
-                  │
-        ┌─────────┼─────────┐
-        │         │         │
-        ▼         ▼         ▼
-   Container   Container   Container
+                    IMAGE
+                      │
+          ┌───────────┼───────────┐
+          │           │           │
+          ▼           ▼           ▼
+      Container   Container   Container
+          #1          #2          #3
 ```
+
+One image can therefore be used to create many containers.
 
 ---
 
-# 1.6 Why does Docker separate them?
+# 5. Why Does Docker Separate Images and Containers?
 
-This becomes extremely important for CI/CD.
+This is one of the most important design ideas in Docker.
 
-Imagine your CI pipeline builds:
-
-```text
-myapp:1.0
-```
-
-The resulting image can then be used in multiple environments:
+Imagine you build:
 
 ```text
-                    myapp:1.0
-                        │
-          ┌─────────────┼─────────────┐
-          ▼             ▼             ▼
-       Testing       Staging       Production
+my-app:1.0
 ```
 
-The **same image** can move through the pipeline.
+You now have a packaged application artifact.
 
-This gives us a powerful CI/CD principle:
+You could use that same artifact for:
 
-> **Build the artifact once, then deploy that same artifact.**
+```text
+Testing
+Staging
+Production
+```
 
-You don't want production to secretly build something different from what you tested.
+Conceptually:
 
-The Docker image becomes the deployable artifact.
+```text
+                  my-app:1.0
+                      │
+          ┌───────────┼───────────┐
+          │           │           │
+          ▼           ▼           ▼
+       Testing     Staging    Production
+```
 
-This is one reason Docker image building is so important to CI/CD.
+Each environment can create a container from the same image.
+
+This gives us an important CI/CD principle:
+
+> **Build the artifact once, then promote that same artifact through environments.**
+
+The image is the artifact.
+
+The container is the runtime instance.
 
 ---
 
-# 1.7 Image is not Container
+# 6. Image Is Not a Running Application
 
-A common beginner mistake is saying:
+This is a common beginner confusion.
 
-> "I built a container."
-
-Technically, the usual process is:
+Suppose you have:
 
 ```text
-Source code
-     │
-     ▼
-Docker image
-     │
-     ▼
-Docker container
+my-app:1.0
+```
+
+That does **not** necessarily mean:
+
+```text
+"my application is currently running."
+```
+
+It means:
+
+```text
+"I have an image from which a container can be created."
+```
+
+The basic workflow is:
+
+```text
+Image
+  │
+  │ docker run
+  ▼
+Container
+  │
+  ▼
+Application process
 ```
 
 So:
@@ -261,163 +231,1264 @@ So:
 docker build
 ```
 
-creates/builds an **image**.
-
-Then:
+and:
 
 ```bash
 docker run
 ```
 
-creates and starts a **container** from that image.
-
-The roadmap later explicitly introduces this workflow:
-
-```text
-docker build → image → docker run
-```
-
-and eventually:
-
-```text
-Docker image → docker push → registry
-```
-
-
+have different jobs.
 
 ---
 
-# 1.8 A concrete example
+# 7. What Does `docker build` Do?
 
-Suppose we have:
+When you eventually run:
+
+```bash
+docker build -t my-app:1.0 .
+```
+
+the result is an **image**.
+
+Conceptually:
+
+```text
+Source + Dockerfile
+        │
+        │ docker build
+        ▼
+   Docker Image
+   my-app:1.0
+```
+
+The command does not directly mean:
+
+```text
+"start my application."
+```
+
+It means:
+
+> **Build the image.**
+
+We will study exactly how that build happens when we reach Dockerfile, build context, and image layers.
+
+---
+
+# 8. What Does `docker run` Do?
+
+Once the image exists:
+
+```text
+my-app:1.0
+```
+
+you can run:
+
+```bash
+docker run my-app:1.0
+```
+
+Conceptually:
+
+```text
+Docker Image
+     │
+     │ docker run
+     ▼
+Docker Container
+     │
+     ▼
+Application process
+```
+
+So the basic lifecycle is:
+
+```text
+docker build
+      │
+      ▼
+    Image
+      │
+      │ docker run
+      ▼
+  Container
+```
+
+This is one of the most important command relationships in Docker.
+
+---
+
+# 9. A Concrete Example
+
+Suppose you have:
 
 ```text
 my-app/
 └── app.py
 ```
 
-We eventually write a Dockerfile describing how to package the application.
-
-Then:
+Eventually, you create the Docker build definition and execute:
 
 ```bash
 docker build -t my-app:1.0 .
 ```
 
-Conceptually:
+You now have:
 
 ```text
-             Dockerfile
-                 │
-                 │
-app.py ──────────┤
-                 │
-                 ▼
-          docker build
-                 │
-                 ▼
-        ┌────────────────┐
-        │ my-app:1.0     │
-        │ Docker Image   │
-        └────────────────┘
-                 │
-                 │ docker run
-                 ▼
-        ┌────────────────┐
-        │ Container      │
-        │ running app    │
-        └────────────────┘
+my-app:1.0
 ```
 
-Notice something important:
+which is an image.
 
-**`docker build` doesn't directly create the running application.**
+Then:
 
-It produces the **image**.
+```bash
+docker run my-app:1.0
+```
 
-Then the image is used to create a **container**.
+creates a container from that image.
+
+The complete simplified flow is:
+
+```text
+             Application
+             source code
+                  │
+                  ▼
+              Dockerfile
+                  │
+                  │ docker build
+                  ▼
+        ┌──────────────────┐
+        │ Docker Image      │
+        │ my-app:1.0        │
+        └──────────────────┘
+                  │
+                  │ docker run
+                  ▼
+        ┌──────────────────┐
+        │ Docker Container  │
+        │ running app       │
+        └──────────────────┘
+```
 
 ---
 
-# 1.9 Why this matters for CI/CD
+# 10. One Image Can Create Multiple Containers
 
-Now connect this to the project goal.
+This is extremely important.
 
-A CI/CD pipeline might eventually look like:
+Suppose we have:
+
+```text
+my-app:1.0
+```
+
+We can create:
+
+```text
+my-app:1.0
+    │
+    ├── Container A
+    ├── Container B
+    └── Container C
+```
+
+For example:
+
+```bash
+docker run --name app-1 my-app:1.0
+docker run --name app-2 my-app:1.0
+docker run --name app-3 my-app:1.0
+```
+
+The three containers originate from the same image.
+
+Conceptually:
+
+```text
+                 my-app:1.0
+                     │
+          ┌──────────┼──────────┐
+          ▼          ▼          ▼
+       app-1       app-2       app-3
+```
+
+This is one of the reasons images are useful as reusable application artifacts.
+
+---
+
+# 11. Are Those Containers the Same?
+
+No.
+
+They came from the same image, but they are **different container instances**.
+
+Think:
+
+```text
+Same Image
+    │
+    ├── Container A
+    │
+    ├── Container B
+    │
+    └── Container C
+```
+
+Each container has its own:
+
+* container identity
+* runtime state
+* writable changes
+* process state
+* network identity/configuration
+
+So:
+
+> **Same image does not mean same container.**
+
+---
+
+# 12. A Useful Analogy — Blueprint vs Building
+
+A better analogy than "ISO" for the initial mental model is:
+
+```text
+Blueprint
+    │
+    ├── Building A
+    ├── Building B
+    └── Building C
+```
+
+Similarly:
+
+```text
+Docker Image
+    │
+    ├── Container A
+    ├── Container B
+    └── Container C
+```
+
+The image provides the common packaged starting point.
+
+Each container is an individual runtime instance.
+
+This analogy isn't technically perfect, but it helps establish the relationship.
+
+---
+
+# 13. Don't Think of a Container as a Virtual Machine
+
+Another important beginner misconception:
+
+> **A Docker container is not simply a lightweight virtual machine.**
+
+A virtual machine generally contains:
+
+```text
+VM
+├── Application
+├── Libraries
+├── Guest OS
+└── Virtual hardware
+```
+
+A container uses the host kernel through operating-system isolation mechanisms.
+
+Very simplified:
+
+```text
+Virtual Machines
+
+Application
+    ↓
+Guest OS
+    ↓
+Hypervisor
+    ↓
+Host
+
+
+Containers
+
+Application
+    ↓
+Container
+    ↓
+Host Kernel
+```
+
+We don't need to go deeper into namespaces, cgroups, container runtimes, or kernel behavior yet.
+
+Those are advanced topics.
+
+For now, remember:
+
+> **Container ≠ VM.**
+
+---
+
+# 14. Is the Image a Complete Operating System?
+
+This is another common misconception.
+
+You may hear:
+
+> "This image contains Ubuntu."
+
+For example:
+
+```text
+ubuntu:24.04
+```
+
+But that doesn't mean the image contains a complete bootable Ubuntu virtual machine.
+
+A container image provides a filesystem/user-space environment and configuration for containers.
+
+The container does not boot its own kernel like a VM.
+
+So don't mentally model:
+
+```text
+Docker Image
+    =
+Complete VM
+```
+
+Instead:
+
+```text
+Docker Image
+    =
+Packaged filesystem + configuration
+for creating a container
+```
+
+---
+
+# 15. What Happens When a Container Starts?
+
+At a high level:
+
+```text
+Docker Image
+      │
+      │ create/start
+      ▼
+Container
+      │
+      ▼
+Main process starts
+```
+
+For example, an image might specify that the application should start with:
+
+```text
+python app.py
+```
+
+When a container is started, that process runs inside the container environment.
+
+The important relationship is:
+
+```text
+Image
+  │
+  │ provides filesystem/configuration
+  ▼
+Container
+  │
+  │ provides runtime environment
+  ▼
+Application process
+```
+
+We'll study the exact filesystem and startup behavior later.
+
+---
+
+# 16. The Container Has Its Own Runtime Changes
+
+This is an important difference between the image and the container.
+
+Suppose an image contains:
+
+```text
+/app/app.py
+```
+
+When a container is created, Docker provides a writable layer on top of the image's read-only filesystem layers.
+
+Conceptually:
+
+```text
+Container
+┌───────────────────────────┐
+│ Writable container layer  │
+├───────────────────────────┤
+│ Image filesystem          │
+│                           │
+│ Application               │
+│ Dependencies              │
+│ Runtime files             │
+└───────────────────────────┘
+```
+
+If the application modifies a file inside the container, that change belongs to the container's writable layer rather than changing the original image.
+
+This is an important concept.
+
+**But don't go too deep into it yet.**
+
+We'll study container filesystem behavior in Step 6 and image layers in Step 4.
+
+---
+
+# 17. Image vs Container: Immutability Mental Model
+
+A useful beginner mental model is:
+
+```text
+Image
+    ↓
+Read-only packaged artifact
+
+Container
+    ↓
+Runtime instance with writable changes
+```
+
+So if you have:
+
+```text
+my-app:1.0
+```
+
+and create:
+
+```text
+container-A
+```
+
+then modify something inside `container-A`, you have **not modified the original image**.
+
+You modified that container's runtime state.
+
+This is one reason the image can safely be reused to create additional containers.
+
+---
+
+# 18. What Happens If the Container Is Deleted?
+
+Suppose:
+
+```text
+my-app:1.0
+      │
+      ▼
+container-A
+```
+
+You make changes inside the container.
+
+Then:
+
+```bash
+docker rm container-A
+```
+
+The container is removed.
+
+The image:
+
+```text
+my-app:1.0
+```
+
+can still exist.
+
+So:
+
+```text
+Image
+ │
+ ├── Container A  ← deleted
+ │
+ └── Container B  ← can still be created
+```
+
+The image and container have different lifecycles.
+
+This distinction becomes very important in real Docker usage.
+
+---
+
+# 19. Container Lifecycle vs Image Lifecycle
+
+Think of the image as a reusable artifact:
+
+```text
+Build
+  │
+  ▼
+Image
+  │
+  ├── create container
+  ├── create container
+  └── create container
+```
+
+Containers have their own lifecycle:
+
+```text
+Created
+   │
+   ▼
+Running
+   │
+   ▼
+Stopped
+   │
+   ▼
+Removed
+```
+
+The image doesn't disappear just because one container stops or is removed.
+
+---
+
+# 20. Image Distribution
+
+Images are also designed to be distributed.
+
+For example:
+
+```text
+Developer
+    │
+    │ build
+    ▼
+Docker Image
+    │
+    │ push
+    ▼
+Container Registry
+    │
+    │ pull
+    ▼
+Production Server
+    │
+    │ run
+    ▼
+Container
+```
+
+This is the foundation of the CI/CD workflow we'll eventually build.
+
+For now, just understand:
+
+> **The image is the artifact that can be built, stored, transferred, and used to create containers.**
+
+We'll study registries separately in Step 5.
+
+---
+
+# 21. The CI/CD Mental Model
+
+This distinction becomes especially important in CI/CD.
+
+A simplified pipeline is:
 
 ```text
 Developer
     │
     │ git push
     ▼
-    CI
+CI Pipeline
     │
     ├── Test
     │
-    ├── docker build
-    │
-    ▼
- Docker Image
-    │
-    ├── Scan
-    │
-    ├── Tag
-    │
-    └── Push
-          │
-          ▼
-   Container Registry
-          │
-          ▼
-      Deployment
-          │
-          ▼
-      Container
+    └── docker build
+              │
+              ▼
+         Docker Image
+              │
+              ├── Scan
+              ├── Tag
+              └── Push
+                     │
+                     ▼
+               Image Registry
+                     │
+                     ▼
+                Deployment
+                     │
+                     ▼
+                 Container
 ```
 
-Your project guide describes essentially this progression: source code gets tested, an image is built, the image is scanned/tagged/pushed, and that image is ultimately deployed. 
+Notice the separation:
 
-So when you eventually learn CI/CD, you should be thinking:
+```text
+CI
+ │
+ └── builds IMAGE
 
-> **The CI pipeline builds an image artifact. The deployment system uses that image to create containers.**
+CD
+ │
+ └── deploys IMAGE as CONTAINER
+```
 
-That's the mental model we're building toward.
+That is a very useful mental model for your CI/CD learning path.
 
 ---
 
-# 1.10 The three words you should remember
+# 22. Why "Build Once, Deploy Many" Matters
 
-For now, remember these three:
+Suppose CI builds:
+
+```text
+my-app:1.0
+```
+
+and tests that exact image.
+
+Then staging uses:
+
+```text
+my-app:1.0
+```
+
+and production also uses:
+
+```text
+my-app:1.0
+```
+
+Conceptually:
+
+```text
+                  my-app:1.0
+                       │
+          ┌────────────┼────────────┐
+          ▼            ▼            ▼
+       Testing      Staging     Production
+```
+
+You're not rebuilding the application separately for every environment.
+
+You're promoting the same artifact.
+
+This helps reduce the risk of:
+
+```text
+Tested artifact ≠ Production artifact
+```
+
+Docker images are very useful for this model.
+
+---
+
+# 23. Beginner Misconception: "Dockerfile = Image"
+
+No.
+
+They are three different things:
+
+```text
+Dockerfile
+    │
+    │ docker build
+    ▼
+Docker Image
+    │
+    │ docker run
+    ▼
+Docker Container
+```
+
+### Dockerfile
+
+Instructions describing how an image should be built.
 
 ### Image
 
-**The packaged artifact.**
-
-```text
-Image = what we build
-```
+The built artifact.
 
 ### Container
 
-**An instance created from an image.**
+An instance created from the image.
 
-```text
-Container = what we run
-```
+We'll study Dockerfile next.
 
-### Relationship
+---
+
+# 24. Beginner Misconception: "Container = Image"
+
+No.
+
+An image is the packaged artifact.
+
+A container is an instance created from that image.
 
 ```text
 Image
   │
-  │ creates
+  ├── Container A
+  ├── Container B
+  └── Container C
+```
+
+One image can produce many containers.
+
+---
+
+# 25. Beginner Misconception: "Running a Container Changes the Image"
+
+Normally, no.
+
+Suppose:
+
+```text
+my-app:1.0
+```
+
+creates:
+
+```text
+container-A
+```
+
+and the application changes a file.
+
+That change belongs to the container's writable layer.
+
+The original image remains unchanged.
+
+Conceptually:
+
+```text
+             my-app:1.0
+             Docker Image
+                  │
+                  ▼
+             container-A
+                  │
+                  │ writes file
+                  ▼
+          Container writable layer
+```
+
+This distinction will become much clearer when we study image layers and the container filesystem.
+
+---
+
+# 26. Beginner Misconception: "Stopping a Container Deletes the Image"
+
+No.
+
+For example:
+
+```bash
+docker stop my-container
+```
+
+stops the container.
+
+It does not mean:
+
+```text
+Image deleted
+```
+
+You could start the container again.
+
+Likewise:
+
+```bash
+docker rm my-container
+```
+
+removes that container, but the image can still exist.
+
+So:
+
+```text
+Image lifecycle
+      ≠
+Container lifecycle
+```
+
+---
+
+# 27. Beginner Misconception: "One Image = One Container"
+
+No.
+
+This is one of the most important things to understand.
+
+```text
+                 Image
+                   │
+        ┌──────────┼──────────┐
+        ▼          ▼          ▼
+    Container   Container   Container
+```
+
+This is completely normal.
+
+In production, you may have multiple containers running from the same image.
+
+---
+
+# 28. Beginner Misconception: "Container Is the Application"
+
+A container provides the environment in which the application's main process runs.
+
+More precisely:
+
+```text
+Image
+  │
   ▼
+Container
+  │
+  ▼
+Application process
+```
+
+The container isn't simply the application binary itself.
+
+It's the isolated runtime environment around the process.
+
+---
+
+# 29. What Docker Is Actually Doing
+
+Let's build the simplified lifecycle carefully.
+
+### Step 1 — Build
+
+You have source code and Docker build instructions:
+
+```text
+Source code
+     +
+Dockerfile
+     │
+     │ docker build
+     ▼
+Docker Image
+```
+
+### Step 2 — Create a container
+
+```bash
+docker create my-app:1.0
+```
+
+Conceptually:
+
+```text
+Image
+  │
+  ▼
+Container created
+```
+
+### Step 3 — Start it
+
+```bash
+docker start <container>
+```
+
+Conceptually:
+
+```text
+Container
+    │
+    ▼
+Main process starts
+```
+
+### Or combine create + start
+
+```bash
+docker run my-app:1.0
+```
+
+Conceptually:
+
+```text
+docker run
+    │
+    ├── create container
+    │
+    └── start container
+```
+
+So `docker run` is not the same thing as `docker build`.
+
+---
+
+# 30. The Most Important Command Relationship
+
+Keep this in your head:
+
+```text
+docker build
+      │
+      ▼
+    IMAGE
+      │
+      │ docker run
+      ▼
+  CONTAINER
+```
+
+Or:
+
+```text
+BUILD → IMAGE → RUN → CONTAINER
+```
+
+This is the foundation for the entire Docker image-building topic.
+
+---
+
+# 31. A More Complete Mental Model
+
+Now combine everything we've learned:
+
+```text
+                    Source Code
+                         │
+                         │
+                         ▼
+                    Dockerfile
+                         │
+                         │ docker build
+                         ▼
+                ┌─────────────────┐
+                │   Docker Image  │
+                │                 │
+                │  Packaged       │
+                │  artifact       │
+                └─────────────────┘
+                         │
+                  ┌──────┼──────┐
+                  │      │      │
+                  ▼      ▼      ▼
+               Container Container Container
+                  │      │      │
+                  ▼      ▼      ▼
+               Process  Process  Process
+```
+
+Don't worry yet about exactly how the Dockerfile becomes the image.
+
+That is what the next topics will explain.
+
+---
+
+# 32. Where the Next Topics Fit
+
+Now we can see why the roadmap is ordered this way.
+
+### Step 1 — Container vs Image
+
+```text
+What are the two things?
+```
+
+### Step 2 — Dockerfile
+
+```text
+How do we describe how to build an image?
+```
+
+### Step 3 — Build Context
+
+```text
+What files are available to the build?
+```
+
+### Step 4 — Image Layers
+
+```text
+How is the image actually constructed?
+```
+
+### Step 5 — Image Registry
+
+```text
+Where can the image be stored and distributed?
+```
+
+### Step 6 — Container Filesystem
+
+```text
+What does the filesystem look like when a container runs?
+```
+
+### Step 7 — Base Images
+
+```text
+Where does an image start from?
+```
+
+### Step 8 — Image Tags
+
+```text
+How do we identify/version images?
+```
+
+The progression is deliberate.
+
+---
+
+# 33. What We Are NOT Learning Yet
+
+To keep this topic clean, we're **not going deeply into**:
+
+* Dockerfile instructions
+* build context
+* image layers
+* layer caching
+* registries
+* container filesystem internals
+* namespaces
+* cgroups
+* containerd
+* OCI image specifications
+* overlay filesystems
+* BuildKit internals
+* image digests
+
+You'll encounter many of these later.
+
+For now, the objective is simply:
+
+> **Understand the difference between an image and a container.**
+
+---
+
+# 34. Beginner Level vs Advanced Level
+
+### You should understand now
+
+You should be comfortable with:
+
+* What a Docker image is
+* What a Docker container is
+* Image vs container
+* One image → many containers
+* `docker build` → image
+* `docker run` → container
+* Image as a deployable artifact
+* Container as a runtime instance
+* Why the separation matters in CI/CD
+* Why container changes don't normally modify the original image
+
+### Advanced — leave for later
+
+Don't worry yet about:
+
+* namespaces
+* cgroups
+* overlay2
+* OCI specifications
+* containerd internals
+* runc
+* content-addressable storage
+* image manifests
+* image digests
+* snapshotters
+
+Those concepts are useful eventually, but introducing them now would obscure the fundamental model.
+
+---
+
+# 35. Hands-On: See the Relationship Yourself
+
+If Docker is installed, start by checking your images:
+
+```bash
+docker images
+```
+
+You can then run:
+
+```bash
+docker run --name demo-container nginx
+```
+
+Conceptually:
+
+```text
+nginx image
+     │
+     │ docker run
+     ▼
+demo-container
+```
+
+Check containers:
+
+```bash
+docker ps
+```
+
+Then stop it:
+
+```bash
+docker stop demo-container
+```
+
+Check all containers:
+
+```bash
+docker ps -a
+```
+
+The container is now stopped, but the image can still exist.
+
+You can remove the container:
+
+```bash
+docker rm demo-container
+```
+
+The image can still remain available.
+
+This simple exercise demonstrates the different lifecycles of:
+
+```text
+Image
+  vs
 Container
 ```
 
-Or, even shorter:
+---
 
-> **Build an image. Run a container.**
+# 36. One Small Experiment: Same Image, Two Containers
+
+Run:
+
+```bash
+docker run -d --name app-1 nginx
+```
+
+and:
+
+```bash
+docker run -d --name app-2 nginx
+```
+
+Now:
+
+```bash
+docker ps
+```
+
+You should have two containers:
+
+```text
+nginx image
+    │
+    ├── app-1
+    └── app-2
+```
+
+The important observation is:
+
+> **You did not need two different images to create two containers.**
+
+Both came from the same image.
+
+---
+
+# 37. The Three Terms You Must Remember
+
+At this stage, these three definitions should be very clear.
+
+### Dockerfile
+
+```text
+Instructions for building an image
+```
+
+### Image
+
+```text
+Packaged artifact used to create containers
+```
+
+### Container
+
+```text
+Runtime instance created from an image
+```
+
+The relationship:
+
+```text
+Dockerfile
+    │
+    │ docker build
+    ▼
+  Image
+    │
+    │ docker run
+    ▼
+Container
+```
+
+This is the foundation for the rest of Phase 1.
+
+---
+
+# 38. The One-Sentence Takeaway
+
+If you remember only one thing from Step 1:
+
+> **A Docker image is the packaged artifact, while a container is a runtime instance created from that image.**
+
+Or:
+
+```text
+BUILD AN IMAGE.
+RUN A CONTAINER.
+```
+
+And the complete mental model is:
+
+```text
+                    Dockerfile
+                         │
+                         │ docker build
+                         ▼
+                ┌─────────────────┐
+                │   Docker Image  │
+                │                 │
+                │ "What we build" │
+                └─────────────────┘
+                         │
+                         │ docker run
+                         ▼
+                ┌─────────────────┐
+                │    Container    │
+                │                 │
+                │ "What we run"   │
+                └─────────────────┘
+```
 
 ---
 

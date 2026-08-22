@@ -1,218 +1,202 @@
 # Phase 1 — Part 4: Docker Image Layers
 
-We are now moving to:
 
-```text
-01. Container vs Image       ✅
-02. Dockerfile               ✅
-03. Build context            ✅
-04. Docker image layers      ← NOW
-05. Docker image registry
-06. Container filesystem
-07. Base images
-08. Image tags
-```
+First understand this:
 
-This topic is **very important for CI/CD**, because Docker image layers are directly connected to:
+> **A Docker image is basically a stack of filesystem changes.**
 
-* build caching
-* build speed
-* image size
-* Dockerfile ordering
-* CI pipeline performance
+That is the core idea.
 
 ---
 
-# 1. What Is a Docker Image Layer?
+## 1. Start with a normal filesystem
 
-A Docker image is not just one giant block of files.
-
-It is built from **multiple layers**.
-
-Think of it like this:
+Imagine an empty filesystem:
 
 ```text
-Docker Image
-│
-├── Layer 1
-├── Layer 2
-├── Layer 3
-├── Layer 4
-└── Image configuration
+/
+├── bin/
+├── etc/
+├── home/
+├── tmp/
+└── ...
 ```
 
-A simplified example:
+Now imagine Docker says:
 
-```dockerfile
-FROM python:3.12
+> "Start with Ubuntu."
 
-WORKDIR /app
-
-COPY requirements.txt .
-
-RUN pip install -r requirements.txt
-
-COPY app.py .
-
-CMD ["python", "app.py"]
-```
-
-Conceptually, the image can be thought of as:
-
-```text
-┌─────────────────────────────┐
-│        app.py layer         │
-├─────────────────────────────┤
-│    pip install layer        │
-├─────────────────────────────┤
-│    requirements.txt layer   │
-├─────────────────────────────┤
-│       WORKDIR layer         │
-├─────────────────────────────┤
-│      Python base image      │
-└─────────────────────────────┘
-```
-
-Each layer represents filesystem changes produced during the build.
-
----
-
-# 2. Why Does Docker Use Layers?
-
-The biggest reason is **reuse**.
-
-Imagine you build:
-
-```text
-myapp:1.0
-```
-
-and later build:
-
-```text
-myapp:1.1
-```
-
-If most of the image hasn't changed, Docker doesn't need to rebuild everything from scratch.
-
-It can reuse layers that are still valid.
+The Ubuntu image already contains a filesystem.
 
 Conceptually:
 
 ```text
-Build 1
+Ubuntu base image
 
-Layer A ──┐
-Layer B ──┤
-Layer C ──┤
-Layer D ──┘
-           ↓
-        Image 1
+/
+├── bin/
+├── etc/
+├── home/
+├── usr/
+├── var/
+└── ...
+```
+
+This becomes our starting point.
+
+Think of it as:
+
+```text
+Layer 1
+────────────
+Ubuntu filesystem
+```
+
+---
+
+# 2. Now we add something
+
+Suppose our Dockerfile says:
+
+```dockerfile
+FROM ubuntu:24.04
+
+RUN mkdir /app
+```
+
+Docker starts with:
+
+```text
+Layer 1
+────────────
+Ubuntu filesystem
 ```
 
 Then:
 
-```text
-Build 2
-
-Layer A ── reused
-Layer B ── reused
-Layer C ── reused
-Layer D ── changed
-           ↓
-        Image 2
+```dockerfile
+RUN mkdir /app
 ```
 
-This is the foundation of Docker's **build cache**.
+creates `/app`.
 
-We'll study caching more deeply after this topic.
+So Docker records a filesystem change:
+
+```text
+Layer 2
+────────────
+Added:
+/app/
+```
+
+Now the image conceptually looks like:
+
+```text
+┌──────────────────────┐
+│ Layer 2              │
+│ Added /app           │
+├──────────────────────┤
+│ Layer 1              │
+│ Ubuntu filesystem    │
+└──────────────────────┘
+```
+
+When Docker looks at the complete image, it combines the layers.
+
+The resulting filesystem appears as:
+
+```text
+/
+├── app/
+├── bin/
+├── etc/
+├── home/
+├── usr/
+└── var/
+```
+
+**This is the first important concept.**
+
+A layer does not necessarily represent a complete filesystem.
+
+It represents **changes to the filesystem**.
 
 ---
 
-# 3. Dockerfile Instructions and Layers
+# 3. Add another change
 
-At a beginner level, it is useful to associate filesystem-changing Dockerfile instructions with layers.
-
-For example:
+Now:
 
 ```dockerfile
-FROM python:3.12
-
-WORKDIR /app
-
-COPY requirements.txt .
-
-RUN pip install -r requirements.txt
-
-COPY app.py .
+RUN mkdir /app/logs
 ```
 
-Think:
+Another change occurs.
 
 ```text
-FROM
- ↓
-Base image
-
-WORKDIR
- ↓
-Filesystem/configuration change
-
-COPY
- ↓
-Layer
-
-RUN
- ↓
-Layer
-
-COPY
- ↓
-Layer
+Layer 3
+────────────
+Added:
+/app/logs/
 ```
 
-But there is an important nuance:
-
-> **Not every Dockerfile instruction necessarily creates a filesystem layer.**
-
-For example:
-
-```dockerfile
-CMD ["python", "app.py"]
-```
-
-doesn't create a normal filesystem layer in the same way as `RUN` or `COPY`. It contributes to the image's configuration.
-
-So don't memorize:
-
-> "Every Dockerfile instruction = one layer."
-
-That's too simplistic.
-
-A better model is:
+Now:
 
 ```text
-Dockerfile instruction
-        │
-        ▼
-Does it change the image filesystem?
-        │
-        ├── Yes → filesystem layer/change
-        │
-        └── No  → may affect image configuration
+┌──────────────────────┐
+│ Layer 3              │
+│ Added /app/logs      │
+├──────────────────────┤
+│ Layer 2              │
+│ Added /app           │
+├──────────────────────┤
+│ Layer 1              │
+│ Ubuntu filesystem    │
+└──────────────────────┘
 ```
+
+The final filesystem becomes:
+
+```text
+/
+├── app/
+│   └── logs/
+├── bin/
+├── etc/
+├── home/
+├── usr/
+└── var/
+```
+
+So:
+
+```text
+Layer 1
+   ↓
+Ubuntu
+
+Layer 2
+   ↓
+/app
+
+Layer 3
+   ↓
+/app/logs
+```
+
+That's what **layering** means.
 
 ---
 
-# 4. Let's Build an Example
+# 4. Now let's use a real application
 
-Suppose we have:
+Suppose you have:
 
 ```text
-my-app/
+myapp/
 ├── Dockerfile
-├── app.py
-└── requirements.txt
+├── requirements.txt
+└── app.py
 ```
 
 Dockerfile:
@@ -231,744 +215,1127 @@ COPY app.py .
 CMD ["python", "app.py"]
 ```
 
-Run:
-
-```bash
-docker build -t myapp:1.0 .
-```
-
-Conceptually:
-
-```text
-                Dockerfile
-                    │
-                    ▼
-              Build process
-                    │
-       ┌────────────┼────────────┐
-       ▼            ▼            ▼
-      FROM         COPY          RUN
-       │            │             │
-       ▼            ▼             ▼
-  Base image    requirements   Python deps
-       │
-       └──────────────┬───────────────┐
-                      ▼               ▼
-                  COPY app.py      CMD config
-                      │
-                      ▼
-                 Final image
-```
+Let's understand exactly what happens.
 
 ---
 
-# 5. The Base Image Is Already Layered
-
-This is another important concept.
-
-When you write:
+# 5. First: `FROM`
 
 ```dockerfile
 FROM python:3.12
 ```
 
-you're not necessarily starting with an empty filesystem.
+You are saying:
 
-The Python image itself is already built from layers.
+> "Start my image using the filesystem provided by the Python image."
+
+The Python image itself already contains layers.
 
 Conceptually:
 
 ```text
-Your Image
-│
-├── Your application layer
-├── Your dependency layer
-├── Your configuration/files
-│
-└── python:3.12
-      │
-      ├── Python layer
-      ├── OS filesystem layer
-      └── Other base layers
+python:3.12
+
+┌────────────────────────┐
+│ Python-related files   │
+├────────────────────────┤
+│ OS filesystem          │
+├────────────────────────┤
+│ Base filesystem        │
+└────────────────────────┘
 ```
 
-So your final image is effectively built **on top of existing image layers**.
+So your image doesn't start from zero.
 
-This is one reason base-image selection matters.
+It starts here:
+
+```text
+Your image
+
+┌────────────────────────┐
+│                        │
+│     Your changes       │
+│                        │
+├────────────────────────┤
+│ Python image layers    │
+├────────────────────────┤
+│ Python image layers    │
+└────────────────────────┘
+```
+
+This is extremely important.
 
 ---
 
-# 6. Image Layers Are Immutable
+# 6. `WORKDIR /app`
 
-This is a very important concept.
+Next:
 
-Once a layer has been created, Docker doesn't normally modify that existing layer.
+```dockerfile
+WORKDIR /app
+```
 
-Instead, a new change produces another layer.
+Docker establishes `/app` as the working directory.
+
+For the **mental model**, you can think of this as part of the image state/configuration.
+
+But don't get stuck on:
+
+> "`WORKDIR` always creates a filesystem layer."
+
+That's not the important lesson.
+
+The important thing is:
+
+```text
+FROM
+ ↓
+starting image
+
+WORKDIR
+ ↓
+working-directory configuration
+
+COPY
+ ↓
+filesystem change
+
+RUN
+ ↓
+filesystem change
+
+COPY
+ ↓
+filesystem change
+
+CMD
+ ↓
+container startup configuration
+```
+
+---
+
+# 7. `COPY requirements.txt .`
+
+Now we get to something important.
+
+You have:
+
+```text
+requirements.txt
+```
+
+on your build context.
+
+Docker executes:
+
+```dockerfile
+COPY requirements.txt .
+```
+
+Suppose the file contains:
+
+```text
+flask==3.1.0
+requests==2.32.3
+```
+
+Docker adds that file to `/app`.
+
+Now the filesystem contains:
+
+```text
+/app/
+└── requirements.txt
+```
+
+Conceptually:
+
+```text
+┌────────────────────────────┐
+│ Layer                      │
+│                            │
+│ /app/requirements.txt      │
+├────────────────────────────┤
+│ Python base image          │
+└────────────────────────────┘
+```
+
+This is a filesystem change.
+
+---
+
+# 8. Then `RUN pip install`
+
+Now:
+
+```dockerfile
+RUN pip install -r requirements.txt
+```
+
+This command executes **during the image build**.
+
+It installs:
+
+```text
+Flask
+Requests
+...
+```
+
+into the image filesystem.
+
+So another filesystem change happens.
+
+Conceptually:
+
+```text
+┌────────────────────────────┐
+│ Layer 4                    │
+│ Python packages installed  │
+├────────────────────────────┤
+│ Layer 3                    │
+│ requirements.txt           │
+├────────────────────────────┤
+│ Python base image          │
+└────────────────────────────┘
+```
+
+Now the image contains:
+
+```text
+/app/
+└── requirements.txt
+
+/usr/local/lib/python3.12/
+├── flask
+├── requests
+└── ...
+```
+
+This is a major layer.
+
+Why?
+
+Because installing dependencies might take:
+
+```text
+10 seconds
+30 seconds
+2 minutes
+```
+
+depending on the application.
+
+---
+
+# 9. Then `COPY app.py`
+
+Now:
+
+```dockerfile
+COPY app.py .
+```
+
+Docker adds:
+
+```text
+/app/app.py
+```
+
+Now conceptually:
+
+```text
+┌────────────────────────────┐
+│ Layer 5                    │
+│ /app/app.py                │
+├────────────────────────────┤
+│ Layer 4                    │
+│ Python dependencies        │
+├────────────────────────────┤
+│ Layer 3                    │
+│ requirements.txt           │
+├────────────────────────────┤
+│ Python base image          │
+└────────────────────────────┘
+```
+
+That's your image.
+
+---
+
+# 10. Here's the key idea
+
+When you run:
+
+```bash
+docker run myapp:1.0
+```
+
+Docker doesn't have five completely separate filesystems.
+
+Instead, Docker presents a **combined filesystem view**.
 
 Think:
 
 ```text
-Layer 1
+Layer 5
    ↓
-Layer 2
+Layer 4
    ↓
 Layer 3
-```
-
-rather than:
-
-```text
-Layer 1
    ↓
-modify Layer 1
-   ↓
-Layer 1 changed
+Base layers
 ```
 
-Conceptually:
+Docker combines them.
+
+You see:
 
 ```text
-Original
-
-┌─────────────┐
-│   Layer 3   │
-├─────────────┤
-│   Layer 2   │
-├─────────────┤
-│   Layer 1   │
-└─────────────┘
-```
-
-If another build changes something:
-
-```text
-┌─────────────┐
-│   Layer 4   │ ← new
-├─────────────┤
-│   Layer 3   │ ← reused
-├─────────────┤
-│   Layer 2   │ ← reused
-├─────────────┤
-│   Layer 1   │ ← reused
-└─────────────┘
-```
-
-This is what makes layer reuse possible.
-
----
-
-# 7. The Big CI/CD Advantage
-
-Imagine this Dockerfile:
-
-```dockerfile
-FROM python:3.12
-
-WORKDIR /app
-
-COPY requirements.txt .
-
-RUN pip install -r requirements.txt
-
-COPY app.py .
-
-CMD ["python", "app.py"]
-```
-
-Suppose you change only:
-
-```text
-app.py
-```
-
-Your dependencies haven't changed.
-
-Docker can potentially reuse:
-
-```text
-FROM python:3.12
-        ↓
-WORKDIR /app
-        ↓
-COPY requirements.txt
-        ↓
-RUN pip install
-```
-
-and only rebuild the part affected by:
-
-```text
-COPY app.py
-```
-
-Conceptually:
-
-```text
-             Build #1
-                │
-                ▼
-┌─────────────────────────┐
-│ Python base             │ ← cached
-├─────────────────────────┤
-│ requirements.txt        │ ← cached
-├─────────────────────────┤
-│ pip install             │ ← cached
-├─────────────────────────┤
-│ app.py                  │ ← changed
-└─────────────────────────┘
-```
-
-This can make a huge difference in CI/CD.
-
----
-
-# 8. Why Dockerfile Ordering Matters
-
-Now we're getting to one of the most important practical lessons.
-
-Compare these two Dockerfiles.
-
-### Version A
-
-```dockerfile
-FROM python:3.12
-
-WORKDIR /app
-
-COPY requirements.txt .
-
-RUN pip install -r requirements.txt
-
-COPY app.py .
-
-CMD ["python", "app.py"]
-```
-
-### Version B
-
-```dockerfile
-FROM python:3.12
-
-WORKDIR /app
-
-COPY . .
-
-RUN pip install -r requirements.txt
-
-CMD ["python", "app.py"]
-```
-
-Suppose only `app.py` changes.
-
-With Version A:
-
-```text
-requirements.txt
-      ↓
-pip install
-      ↓
-cached
-```
-
-So Docker can reuse the dependency installation.
-
-With Version B:
-
-```text
-COPY .
-   ↓
-app.py changed
-   ↓
-COPY layer changed
-   ↓
-RUN pip install
-   ↓
-cache invalidated
-   ↓
-dependencies installed again
-```
-
-Therefore:
-
-> **Dockerfile instruction ordering can have a major impact on build performance.**
-
-This becomes extremely important in CI pipelines.
-
----
-
-# 9. Think of Layers as a Stack
-
-A useful mental model is:
-
-```text
-             Top
-              │
-       ┌─────────────┐
-       │ Application │
-       ├─────────────┤
-       │ Dependencies│
-       ├─────────────┤
-       │ Configuration
-       ├─────────────┤
-       │ Base image  │
-       └─────────────┘
-              │
-             Base
-```
-
-The image is constructed from the bottom upward.
-
-Each layer adds filesystem changes.
-
----
-
-# 10. What Happens When a File Is Deleted?
-
-This is an interesting consequence of layered images.
-
-Suppose:
-
-```dockerfile
-RUN echo "secret" > /tmp/secret.txt
-```
-
-creates a file in one layer.
-
-Then later:
-
-```dockerfile
-RUN rm /tmp/secret.txt
-```
-
-removes it from the **current filesystem view**.
-
-But the original layer still contains the file.
-
-Conceptually:
-
-```text
-Layer 2
-┌─────────────────────┐
-│ secret.txt          │
-└─────────────────────┘
-          ↓
-Layer 3
-┌─────────────────────┐
-│ deletion of file    │
-└─────────────────────┘
-```
-
-The final container filesystem may no longer show:
-
-```text
-/tmp/secret.txt
-```
-
-but the data may still exist in the underlying image history/layers.
-
-This is one reason you should **never put secrets into an image and assume deleting them later makes them safe**.
-
-Bad:
-
-```dockerfile
-RUN echo "my-password" > /tmp/password
-RUN rm /tmp/password
-```
-
-The correct principle is:
-
-> **Don't introduce secrets into image layers in the first place.**
-
-We'll cover proper build secrets later.
-
----
-
-# 11. Image Layers vs Container Writable Layer
-
-There's another distinction we'll eventually explore in the **Container Filesystem** section.
-
-When you create a container from an image:
-
-```text
-Docker Image
-    │
-    ├── Layer 1
-    ├── Layer 2
-    ├── Layer 3
-    └── Layer 4
-           │
-           ▼
-       Container
-           │
-           ▼
-    Writable layer
-```
-
-The image layers are normally read-only.
-
-The running container gets a writable layer on top.
-
-So conceptually:
-
-```text
-Container
+/
+├── app/
+│   ├── requirements.txt
+│   └── app.py
 │
-├── Writable container layer
+├── usr/
+│   └── local/
+│       └── lib/
+│           └── python3.12/
+│               ├── flask/
+│               ├── requests/
+│               └── ...
 │
-├── Image layer 3
-├── Image layer 2
-└── Image layer 1
+├── bin/
+├── etc/
+└── ...
 ```
 
-We'll study this properly later.
-
-For now, remember:
-
-> **Image layers form the immutable image; a running container gets its own writable layer.**
+So the application sees **one filesystem**, even though internally it is assembled from layers.
 
 ---
 
-# 12. How to See Image Layers
+# 11. Now the REALLY important part: Why layers?
 
-You don't have to rely only on theory.
-
-Docker provides:
-
-```bash
-docker image history myapp:1.0
-```
-
-For example:
-
-```bash
-docker image history myapp:1.0
-```
-
-This shows the image's build history.
-
-You'll see information corresponding to commands such as:
-
-```text
-CMD
-COPY
-RUN
-WORKDIR
-FROM
-```
-
-The exact output depends on the image and builder.
-
-This is one of the best commands for understanding how an image was constructed.
-
----
-
-# 13. `docker image inspect`
-
-Another useful command is:
-
-```bash
-docker image inspect myapp:1.0
-```
-
-This provides detailed image metadata.
-
-You'll eventually encounter information such as:
-
-```text
-Id
-RepoTags
-RepoDigests
-RootFS
-Config
-Architecture
-OS
-```
-
-The `RootFS` information is particularly relevant to understanding the image's layers.
-
-Don't worry about every field yet.
-
-We'll use this command more as we progress.
-
----
-
-# 14. Layer Sharing
-
-One of Docker's biggest advantages is that different images can share layers.
-
-Imagine:
-
-```text
-python:3.12
-      │
-      ├──────────────┐
-      │              │
-      ▼              ▼
-   myapp:1.0      myapp:2.0
-```
-
-Both applications might use:
-
-```text
-python:3.12
-```
-
-So they can potentially share the same underlying base layers.
-
-Conceptually:
-
-```text
-              python base layers
-                    │
-             ┌──────┴──────┐
-             ▼             ▼
-          myapp:1.0     myapp:2.0
-```
-
-Docker doesn't necessarily need to store duplicate copies of identical layers.
-
-This reduces storage requirements.
-
----
-
-# 15. Layer Reuse in CI/CD
-
-Now connect everything together.
-
-Suppose Jenkins builds:
+Imagine you build:
 
 ```text
 myapp:1.0
 ```
 
-Monday:
+Today.
+
+Docker creates:
 
 ```text
-FROM python:3.12
-COPY requirements.txt .
-RUN pip install ...
-COPY app.py .
+Base Python layers
+        ↓
+requirements.txt layer
+        ↓
+pip install layer
+        ↓
+app.py layer
 ```
 
-Tuesday:
+Now tomorrow you change only:
 
 ```text
-app.py changed
+app.py
 ```
 
-A well-configured build environment may be able to reuse:
+You build again.
+
+Docker asks:
+
+> "Did the earlier parts change?"
+
+Python base?
+
+```text
+No
+```
+
+`requirements.txt`?
+
+```text
+No
+```
+
+Dependency installation?
+
+```text
+No
+```
+
+`app.py`?
+
+```text
+YES
+```
+
+Therefore Docker can potentially reuse:
 
 ```text
 Python base
-       ↓
-requirements
-       ↓
-installed dependencies
+     ↓
+requirements.txt
+     ↓
+pip install
 ```
 
-and only rebuild the application layer.
+and rebuild the changed part.
 
-This gives:
+Conceptually:
 
 ```text
-Less work
-   ↓
-Faster Docker build
-   ↓
-Faster CI pipeline
-   ↓
-Faster deployment cycle
+OLD BUILD
+
+Python base          ✅
+requirements.txt     ✅
+pip install          ✅
+app.py                ✅
+
+
+NEW BUILD
+
+Python base          ♻️ reuse
+requirements.txt     ♻️ reuse
+pip install          ♻️ reuse
+app.py                🔨 rebuild
 ```
 
-That's why understanding layers isn't just Docker theory.
-
-It's directly relevant to your CI/CD goal.
+**That is why layers matter.**
 
 ---
 
-# 16. A Critical Mental Model
+# 12. Without layers
 
-Don't think:
+Imagine Docker treated the image as one giant object:
 
 ```text
-Dockerfile
-    ↓
-one giant image
+┌───────────────────────────┐
+│                           │
+│ Python                    │
+│ dependencies              │
+│ requirements              │
+│ application               │
+│ everything                │
+│                           │
+└───────────────────────────┘
 ```
+
+You change:
+
+```text
+app.py
+```
+
+Docker would have to rebuild the whole thing.
+
+Conceptually:
+
+```text
+Change app.py
+     ↓
+Rebuild everything
+     ↓
+Slow
+```
+
+With layers:
+
+```text
+Change app.py
+     ↓
+Earlier layers still valid
+     ↓
+Reuse them
+     ↓
+Build only necessary later work
+     ↓
+Fast
+```
+
+This is the fundamental reason layers are valuable.
+
+---
+
+# 13. Now understand Dockerfile ordering
+
+This is where your CI/CD concern comes in.
+
+Good:
+
+```dockerfile
+COPY requirements.txt .
+
+RUN pip install -r requirements.txt
+
+COPY app.py .
+```
+
+Why?
+
+Because these two things change at different frequencies.
+
+Usually:
+
+```text
+requirements.txt
+        ↓
+changes occasionally
+
+app.py
+        ↓
+changes frequently
+```
+
+Therefore we separate them.
+
+Conceptually:
+
+```text
+Dependency layer
+        ↓
+changes rarely
+        ↓
+cache it
+
+Application layer
+        ↓
+changes frequently
+        ↓
+rebuild it
+```
+
+---
+
+# 14. Bad ordering
+
+Suppose you write:
+
+```dockerfile
+COPY . .
+
+RUN pip install -r requirements.txt
+```
+
+Your directory:
+
+```text
+myapp/
+├── Dockerfile
+├── requirements.txt
+├── app.py
+├── config.py
+└── README.md
+```
+
+`COPY . .` copies everything.
+
+Now you change only:
+
+```text
+README.md
+```
+
+The contents of the `COPY . .` instruction change.
+
+That can invalidate the cache for the following:
+
+```dockerfile
+RUN pip install -r requirements.txt
+```
+
+So Docker may need to run:
+
+```text
+pip install
+```
+
+again.
+
+Even though:
+
+```text
+requirements.txt
+```
+
+didn't change.
+
+That's wasteful.
+
+---
+
+# 15. This is the CI/CD connection
+
+Imagine Jenkins builds your application:
+
+```text
+Developer
+    │
+    ▼
+Git push
+    │
+    ▼
+Jenkins
+    │
+    ▼
+docker build
+```
+
+Your developers push code 50 times per day.
+
+If your Dockerfile is optimized:
+
+```text
+requirements unchanged
+       ↓
+dependency layer cached
+       ↓
+only application changes
+       ↓
+fast build
+```
+
+If poorly structured:
+
+```text
+source changed
+       ↓
+large COPY invalidated
+       ↓
+dependency installation runs again
+       ↓
+slow build
+```
+
+Multiply that by:
+
+```text
+10 builds/day
+50 builds/day
+100 builds/day
+```
+
+and Dockerfile layer design becomes a real CI/CD performance issue.
+
+---
+
+# 16. Now let's understand "immutable"
+
+This word confused many beginners.
+
+Suppose this exists:
+
+```text
+Layer 3
+
+/app/app.py
+```
+
+Later you change `app.py`.
+
+Docker doesn't normally go inside the old layer and edit:
+
+```text
+Layer 3
+```
+
+Instead, the new build produces another filesystem change.
 
 Think:
 
 ```text
-Dockerfile
-    ↓
-sequence of filesystem changes
-    ↓
-multiple image layers
-    ↓
-final image
+Old image
+
+Layer C
+app.py version 1
+     ↓
+Layer B
+dependencies
+     ↓
+Layer A
+Python
 ```
 
-For example:
+New image:
+
+```text
+Layer D
+app.py version 2
+     ↓
+Layer B
+dependencies
+     ↓
+Layer A
+Python
+```
+
+Notice:
+
+```text
+Layer A → reused
+Layer B → reused
+Layer C → not needed by new image
+Layer D → new
+```
+
+That's the important meaning of **immutable layers**.
+
+---
+
+# 17. What about deleting a file?
+
+This is another place where layers become interesting.
+
+Suppose:
+
+```dockerfile
+RUN echo "secret" > /tmp/password
+```
+
+A layer contains:
+
+```text
+/tmp/password
+```
+
+Then:
+
+```dockerfile
+RUN rm /tmp/password
+```
+
+The new filesystem view no longer shows:
+
+```text
+/tmp/password
+```
+
+But the previous layer may still contain the data.
+
+Think:
+
+```text
+Layer 2
+────────────────
+/tmp/password
+"secret"
+
+
+Layer 3
+────────────────
+Delete /tmp/password
+```
+
+Final filesystem:
+
+```text
+/tmp/password
+     ↓
+not visible
+```
+
+But:
+
+```text
+old layer
+     ↓
+may still contain it
+```
+
+Therefore:
+
+> **Deleting a secret in a later Dockerfile instruction does not make the secret safe.**
+
+This is why you don't do:
+
+```dockerfile
+RUN echo "PASSWORD=secret" > /tmp/config
+RUN rm /tmp/config
+```
+
+You should avoid putting secrets into normal image layers in the first place.
+
+---
+
+# 18. Image layers vs container layer
+
+This distinction is extremely important.
+
+Suppose your image is:
+
+```text
+Image
+
+Layer 4
+app.py
+
+Layer 3
+dependencies
+
+Layer 2
+requirements
+
+Layer 1
+Python
+```
+
+These image layers are effectively read-only.
+
+Now you run:
+
+```bash
+docker run myapp:1.0
+```
+
+Docker creates a container.
+
+Conceptually:
+
+```text
+Container
+
+┌─────────────────────────────┐
+│ Writable container layer    │ ← changes here
+├─────────────────────────────┤
+│ Image Layer 4               │
+├─────────────────────────────┤
+│ Image Layer 3               │
+├─────────────────────────────┤
+│ Image Layer 2               │
+├─────────────────────────────┤
+│ Image Layer 1               │
+└─────────────────────────────┘
+```
+
+Suppose the application creates:
+
+```text
+/app/output.log
+```
+
+That change goes into the **container's writable layer**, not into the original image layer.
+
+This is why:
+
+```text
+Image
+```
+
+and
+
+```text
+Container
+```
+
+are different concepts.
+
+We'll study this properly in **Part 6 — Container Filesystem**.
+
+---
+
+# 19. The easiest analogy
+
+Think of Docker layers like **transparent sheets**.
+
+Imagine:
+
+### Sheet 1
+
+```text
+Ubuntu filesystem
+```
+
+Put another transparent sheet on top:
+
+### Sheet 2
+
+```text
+Add /app
+```
+
+Another:
+
+### Sheet 3
+
+```text
+Add Python dependencies
+```
+
+Another:
+
+### Sheet 4
+
+```text
+Add app.py
+```
+
+Put all sheets together:
+
+```text
+       Sheet 4
+     app.py
+───────────────
+       Sheet 3
+   dependencies
+───────────────
+       Sheet 2
+       /app
+───────────────
+       Sheet 1
+       Ubuntu
+```
+
+Looking from the top, you see one complete filesystem.
+
+But internally, it's built from multiple layers.
+
+That's probably the simplest mental model to keep.
+
+---
+
+# 20. One more important correction
+
+You showed this model:
 
 ```text
 FROM
  ↓
-Base layers
+Layer
 
-COPY requirements.txt
+WORKDIR
  ↓
 Layer
 
-RUN pip install
+COPY
  ↓
 Layer
 
-COPY app.py
+RUN
  ↓
 Layer
 
-Configuration
+COPY
  ↓
-Final image
+Layer
+```
+
+Don't memorize this literally.
+
+A better model is:
+
+```text
+Dockerfile
+     │
+     ├── FROM
+     │     ↓
+     │   existing image/layers
+     │
+     ├── COPY
+     │     ↓
+     │   filesystem change
+     │
+     ├── RUN
+     │     ↓
+     │   filesystem change
+     │
+     ├── COPY
+     │     ↓
+     │   filesystem change
+     │
+     └── CMD
+           ↓
+       image configuration
+```
+
+Modern Docker/BuildKit makes the actual implementation more sophisticated than:
+
+```text
+one instruction = one physical layer
+```
+
+For learning Docker and CI/CD, think primarily in terms of:
+
+> **filesystem changes + cacheable build steps + final image layers**
+
+---
+
+# 21. Let's look at a real build
+
+Create:
+
+```text
+layer-demo/
+├── Dockerfile
+├── requirements.txt
+└── app.py
+```
+
+### Dockerfile
+
+```dockerfile
+FROM python:3.12
+
+WORKDIR /app
+
+COPY requirements.txt .
+
+RUN pip install -r requirements.txt
+
+COPY app.py .
+
+CMD ["python", "app.py"]
+```
+
+Build:
+
+```bash
+docker build -t layer-demo:1.0 .
+```
+
+Then:
+
+```bash
+docker image history layer-demo:1.0
+```
+
+You'll see entries representing the image's construction/history.
+
+Also:
+
+```bash
+docker image inspect layer-demo:1.0
+```
+
+This lets you inspect image metadata and its root filesystem information.
+
+---
+
+# 22. The whole concept in one picture
+
+This is the model I want you to remember:
+
+```text
+                     Dockerfile
+                         │
+                         ▼
+                ┌─────────────────┐
+                │ FROM python     │
+                └────────┬────────┘
+                         │
+                         ▼
+                 Existing layers
+                         │
+                         ▼
+                ┌─────────────────┐
+                │ COPY requirements│
+                └────────┬────────┘
+                         │
+                         ▼
+                  filesystem change
+                         │
+                         ▼
+                ┌─────────────────┐
+                │ RUN pip install │
+                └────────┬────────┘
+                         │
+                         ▼
+                  filesystem change
+                         │
+                         ▼
+                ┌─────────────────┐
+                │ COPY app.py     │
+                └────────┬────────┘
+                         │
+                         ▼
+                  filesystem change
+                         │
+                         ▼
+                  ┌─────────────┐
+                  │ Docker Image│
+                  └──────┬──────┘
+                         │
+                         ▼
+                    docker run
+                         │
+                         ▼
+                  ┌─────────────┐
+                  │  Container  │
+                  ├─────────────┤
+                  │ Writable    │
+                  │ layer       │
+                  ├─────────────┤
+                  │ Image layer │
+                  ├─────────────┤
+                  │ Image layer │
+                  ├─────────────┤
+                  │ Base layers │
+                  └─────────────┘
 ```
 
 ---
 
-# 17. But Don't Oversimplify Layers
+# 23. The 5 things you should understand before moving on
 
-One correction to the beginner mental model:
+If these five points are clear, you've understood Docker layers:
 
-It's tempting to say:
+### 1. An image isn't one giant filesystem
 
-> "Every `RUN`, `COPY`, and `ADD` creates exactly one layer."
+It is assembled from layers.
 
-That's a useful **introductory approximation**, but modern Docker uses BuildKit and more sophisticated build mechanisms.
-
-The more accurate concept is:
-
-> **Docker builds an image from filesystem snapshots/layers and image configuration, with the builder determining how those changes are represented.**
-
-For your current phase, the practical model is enough:
-
-```text
-RUN / COPY / ADD
-        ↓
-filesystem changes
-        ↓
-image layers
-```
-
-Later, when we study **BuildKit**, we'll refine this model.
-
----
-
-# 18. The Most Important Connection: Layers → Cache
-
-Your next major concept after understanding layers is:
-
-```text
-Image Layers
-     ↓
-Build Cache
-     ↓
-Dockerfile optimization
-```
+### 2. A layer represents filesystem changes
 
 For example:
+
+```text
+Add file
+Install package
+Create directory
+Delete file
+```
+
+### 3. Layers are reusable
+
+If an earlier part hasn't changed, Docker can potentially reuse it.
+
+### 4. This creates the build-cache advantage
+
+```text
+unchanged work
+      ↓
+reuse
+      ↓
+less rebuilding
+      ↓
+faster CI
+```
+
+### 5. Dockerfile ordering matters
+
+Prefer:
 
 ```dockerfile
 COPY requirements.txt .
 RUN pip install -r requirements.txt
-
 COPY . .
 ```
 
-is usually structured this way because:
-
-```text
-requirements.txt changes rarely
-        ↓
-dependency layer remains reusable
-
-application source changes frequently
-        ↓
-application layer rebuilds
-```
-
-Whereas:
+over:
 
 ```dockerfile
 COPY . .
 RUN pip install -r requirements.txt
 ```
 
-can cause dependency installation to be repeated when unrelated application files change.
-
-So:
-
-```text
-Good Dockerfile ordering
-          ↓
-Better cache reuse
-          ↓
-Faster CI builds
-```
+when you want dependency installation to remain cacheable when application source changes.
 
 ---
 
-# 19. Your Core Mental Model
+## The single sentence I want you to remember
 
-Remember this diagram:
+> **A Docker image is a stack of filesystem changes built on top of a base image; because unchanged layers can be reused, Docker can avoid repeating expensive build work.**
 
-```text
-                    Dockerfile
-                        │
-                        ▼
-                Build instructions
-                        │
-          ┌─────────────┼─────────────┐
-          ▼             ▼             ▼
-        FROM          COPY            RUN
-          │             │             │
-          ▼             ▼             ▼
-     Base layers    File changes   File changes
-          │             │             │
-          └─────────────┼─────────────┘
-                        ▼
-                  Image layers
-                        │
-                        ▼
-                  Docker Image
-                        │
-                        ▼
-                   Container
-                        │
-                        ▼
-                Writable layer
-```
+And **that** is why image layers matter to your CI/CD learning.
 
-The most important sentence for this lesson:
-
-> **A Docker image is composed of immutable filesystem layers built from the image's base and the changes introduced during the build.**
-
-And the CI/CD connection:
-
-> **Because layers can be reused, Docker can avoid repeating unchanged work, making Dockerfile ordering and build caching critical for fast CI/CD builds.**
-
----
-
-# Phase 1 Progress
-
-```text
-01. Container vs Image       ✅
-02. Dockerfile               ✅
-03. Build context            ✅
-04. Docker image layers      ✅
-05. Docker image registry    ← NEXT
-06. Container filesystem
-07. Base images
-08. Image tags
-```
-
-Next we'll cover **Docker Image Registry**: what a registry actually is, how it differs from Docker Hub, what `docker push`/`docker pull` really do, and how the registry fits into your eventual Jenkins → Registry → Kubernetes CI/CD flow.
