@@ -1,462 +1,35 @@
 # Phase 1 — Part 2: Dockerfile
 
-We are continuing **strictly in the order of the Docker Image Building Guide**.
+## Where we are
 
 ```text
-Phase 1
+Phase 1 — Docker Fundamentals
 
 01. Container vs Image       ✅
 02. Dockerfile               ← NOW
-03. Build context
-04. Docker image layers
-05. Docker image registry
-06. Container filesystem
-07. Base images
-08. Image tags
+03. Build Context
+04. Docker Image Layers
+05. Docker Image Registry
+06. Container Filesystem
+07. Base Images
+08. Image Tags
 ```
-
-We already understand the first fundamental relationship:
-
-```text
-Docker Image
-     ↓
-creates
-     ↓
-Container
-```
-
-Now the next question is:
-
-> **How do we create a Docker image in a repeatable way?**
-
-That's where the **Dockerfile** comes in.
 
 ---
 
-# 1. Basic Concept — What is a Dockerfile?
+## 1. What is a Dockerfile?
 
-A **Dockerfile is a text file containing instructions that Docker uses to build an image.**
+A **Dockerfile is a text file containing instructions that Docker uses to build a Docker image.**
 
-Think of it as the **build recipe** for an image.
-
-```text
-Dockerfile
-    │
-    │ instructions
-    ▼
-Docker build process
-    │
-    ▼
-Docker Image
-```
-
-For example:
+Example:
 
 ```dockerfile
-FROM python:3.12
-
-WORKDIR /app
-
-COPY app.py .
-
-CMD ["python", "app.py"]
+FROM nginx
 ```
 
-This file doesn't contain the Docker image itself.
+A Dockerfile is therefore a **build definition** for an image.
 
-It describes **how the image should be built and how the resulting container should behave**.
-
-So remember:
-
-```text
-Dockerfile = instructions
-Image      = built artifact
-Container  = running instance
-```
-
----
-
-# 2. The Mental Model
-
-A useful mental model is:
-
-```text
-                 Dockerfile
-              "How to build it"
-                     │
-                     │ docker build
-                     ▼
-                Docker Image
-                "What we built"
-                     │
-                     │ docker run
-                     ▼
-                  Container
-                 "What we run"
-```
-
-This is the fundamental relationship.
-
-For example:
-
-```bash
-docker build -t my-app:1.0 .
-```
-
-takes the Dockerfile and produces:
-
-```text
-my-app:1.0
-```
-
-Then:
-
-```bash
-docker run my-app:1.0
-```
-
-uses that image to create and start a container.
-
----
-
-# 3. A Simple Dockerfile
-
-Let's start with a very small example.
-
-Suppose our application is:
-
-```text
-my-app/
-├── app.py
-└── Dockerfile
-```
-
-`app.py`:
-
-```python
-print("Hello from Docker")
-```
-
-Dockerfile:
-
-```dockerfile
-FROM python:3.12
-
-WORKDIR /app
-
-COPY app.py .
-
-CMD ["python", "app.py"]
-```
-
-At this stage, don't worry about mastering each instruction.
-
-Instead, understand the overall flow:
-
-```text
-FROM python:3.12
-        ↓
-Start from an existing image
-
-WORKDIR /app
-        ↓
-Set the working directory
-
-COPY app.py .
-        ↓
-Put application code into the image
-
-CMD ["python", "app.py"]
-        ↓
-Define the default command when the container starts
-```
-
-So the Dockerfile describes the construction and default behavior of the resulting image.
-
----
-
-# 4. What Docker Actually Does
-
-This is where we want to go deeper than simply saying:
-
-> "Dockerfile is a recipe."
-
-When you run:
-
-```bash
-docker build -t my-app:1.0 .
-```
-
-Docker reads the Dockerfile and processes its instructions.
-
-Conceptually:
-
-```text
-Dockerfile
-    │
-    ▼
-Docker build
-    │
-    ├── process FROM
-    │
-    ├── process WORKDIR
-    │
-    ├── process COPY
-    │
-    ├── process CMD
-    │
-    ▼
-Resulting image
-```
-
-Docker isn't simply storing the Dockerfile inside the image.
-
-Instead, the build process uses the instructions to **construct the image**.
-
-This distinction is important.
-
-```text
-Dockerfile
-     │
-     │ describes
-     ▼
-Build process
-     │
-     │ produces
-     ▼
-Image
-```
-
----
-
-# 5. Dockerfile Instructions Are Not All the Same
-
-One of the most important concepts to understand early is that Dockerfile instructions have different roles.
-
-Consider:
-
-```dockerfile
-FROM python:3.12
-
-WORKDIR /app
-
-COPY requirements.txt .
-
-RUN pip install -r requirements.txt
-
-COPY app.py .
-
-CMD ["python", "app.py"]
-```
-
-These instructions don't all mean:
-
-> "Run this command when the container starts."
-
-Instead, some affect the **image build**, while others describe **runtime behavior**.
-
----
-
-# 6. Build-Time vs Runtime
-
-Consider:
-
-```dockerfile
-RUN pip install flask
-```
-
-This happens while Docker is **building the image**.
-
-Conceptually:
-
-```text
-docker build
-     │
-     ▼
-RUN pip install flask
-     │
-     ▼
-Flask becomes part of image
-```
-
-After the image is built, Docker doesn't execute that `RUN` command every time you start a container.
-
-That's a very important distinction.
-
-Now consider:
-
-```dockerfile
-CMD ["python", "app.py"]
-```
-
-This describes the default command to execute when a container is started.
-
-Conceptually:
-
-```text
-docker build
-     │
-     ▼
-Image contains CMD configuration
-     │
-     │ docker run
-     ▼
-Container starts
-     │
-     ▼
-python app.py
-```
-
-So:
-
-```text
-RUN
- │
- └── Build time
-
-CMD
- │
- └── Container runtime
-```
-
-We'll study the exact behavior of `RUN`, `CMD`, and `ENTRYPOINT` later.
-
----
-
-# 7. A Better Classification of Dockerfile Instructions
-
-For now, we can broadly think about the important instructions like this:
-
-| Instruction  | Basic role                                  |
-| ------------ | ------------------------------------------- |
-| `FROM`       | Select the starting image                   |
-| `WORKDIR`    | Set the working directory                   |
-| `COPY`       | Copy files into the image                   |
-| `RUN`        | Execute something during the build          |
-| `ENV`        | Define environment variables                |
-| `EXPOSE`     | Declare an intended container port          |
-| `CMD`        | Define the default runtime command          |
-| `ENTRYPOINT` | Define the main runtime executable/behavior |
-
-Don't memorize this table yet.
-
-We'll study these instructions individually when we reach the dedicated Dockerfile instruction section.
-
-For now, understand that a Dockerfile is made from **different types of instructions that contribute to the final image and/or its runtime behavior**.
-
----
-
-# 8. What Happens to the Application Files?
-
-Suppose we have:
-
-```text
-my-app/
-├── app.py
-├── requirements.txt
-└── Dockerfile
-```
-
-And:
-
-```dockerfile
-FROM python:3.12
-
-WORKDIR /app
-
-COPY requirements.txt .
-
-RUN pip install -r requirements.txt
-
-COPY app.py .
-
-CMD ["python", "app.py"]
-```
-
-The Dockerfile is telling Docker to construct an image that eventually contains something conceptually like:
-
-```text
-/
-└── app/
-    ├── app.py
-    └── requirements.txt
-```
-
-along with the environment provided by the starting image and the installed dependencies.
-
-The important point is:
-
-> **The Dockerfile describes how the application's required environment is assembled into the image.**
-
----
-
-# 9. Dockerfile → Image
-
-Let's follow the complete process.
-
-Project:
-
-```text
-my-app/
-├── app.py
-└── Dockerfile
-```
-
-Dockerfile:
-
-```dockerfile
-FROM python:3.12
-
-WORKDIR /app
-
-COPY app.py .
-
-CMD ["python", "app.py"]
-```
-
-Build:
-
-```bash
-docker build -t my-app:1.0 .
-```
-
-Conceptually:
-
-```text
-             Project
-                │
-                ├── Dockerfile
-                │
-                └── app.py
-                       │
-                       ▼
-                 docker build
-                       │
-                       ▼
-                Build process
-                       │
-                       ▼
-                Docker Image
-                  my-app:1.0
-```
-
-Then:
-
-```bash
-docker run my-app:1.0
-```
-
-gives:
-
-```text
-Docker Image
-     │
-     │ docker run
-     ▼
-Container
-```
-
-So the entire relationship is:
+The important distinction is:
 
 ```text
 Dockerfile
@@ -467,170 +40,237 @@ Docker Image
     │
     │ docker run
     ▼
-Container
+Docker Container
 ```
 
-This is the core mental model for this topic.
+So:
+
+* **Dockerfile** → instructions
+* **Image** → built artifact/template
+* **Container** → running instance of the image
+
+This relationship should remain in our mental model throughout this project.
 
 ---
 
-# 10. Why Not Just Install Everything Manually?
+# 2. Why do we need a Dockerfile?
 
-You could technically do something like:
-
-```text
-Start container
-     ↓
-Install Python
-     ↓
-Copy application
-     ↓
-Install dependencies
-     ↓
-Configure application
-     ↓
-Start application
-```
-
-But imagine doing this manually every time.
-
-You could easily forget:
+Suppose you have an application:
 
 ```text
-Which package did I install?
-Which version?
-Which configuration?
-Which directory?
-Which environment variable?
-Which command?
+my-app/
+├── app.py
+└── requirements.txt
 ```
 
-And another engineer would have to reproduce the same process.
+You want to create an image containing that application.
 
-A Dockerfile turns those steps into a **version-controlled build definition**.
+Docker needs to know things such as:
+
+* What environment should the image start from?
+* Where should the application files go?
+* What dependencies should be installed?
+* What command should run when the container starts?
+
+The Dockerfile defines those instructions.
+
+For example:
+
+```dockerfile
+FROM python:3.12
+
+WORKDIR /app
+
+COPY app.py .
+
+CMD ["python", "app.py"]
+```
+
+We're **not learning these instructions individually yet**. That will come later.
+
+For now, understand that the Dockerfile describes how the image should be constructed.
+
+---
+
+# 3. Dockerfile vs Docker Image
+
+These are different things.
+
+### Dockerfile
+
+A normal text file:
+
+```text
+Dockerfile
+```
+
+containing:
+
+```dockerfile
+FROM nginx
+```
+
+### Docker image
+
+The result of processing that Dockerfile:
+
+```text
+my-nginx:1.0
+```
+
+The process is:
 
 ```text
 Dockerfile
     │
-    ├── repeatable
-    ├── reviewable
-    ├── version controlled
-    └── usable by CI/CD
+    │ docker build
+    ▼
+Docker Image
 ```
 
-That's one of the major reasons Dockerfiles are so important.
+This distinction is particularly important in CI/CD.
+
+The **Dockerfile is part of your source/build definition**, while the **image is the build artifact**.
 
 ---
 
-# 11. Dockerfile as a Build Definition
+# 4. A Simple Project
 
-Think about a normal application.
+Let's use this throughout our learning.
 
-You might have:
+Create:
 
 ```text
-Source code
-    +
-Dependencies
-    +
-Runtime
-    +
-Configuration
+docker-demo/
+└── Dockerfile
 ```
 
-The Dockerfile describes how these pieces should be assembled into the image.
+Put this inside the Dockerfile:
+
+```dockerfile
+FROM nginx
+```
+
+Now build it:
+
+```bash
+docker build -t my-nginx:1.0 .
+```
 
 Conceptually:
 
 ```text
-             Dockerfile
-                  │
-       ┌──────────┼──────────┐
-       │          │          │
-       ▼          ▼          ▼
-    Runtime   Dependencies  App
-       │          │          │
-       └──────────┼──────────┘
-                  ▼
-              Image
-```
-
-This is why it's reasonable to think of a Dockerfile as part of the application's **build definition**.
-
----
-
-# 12. Why This Matters for CI/CD
-
-Now connect this to your actual goal.
-
-Imagine your Git repository contains:
-
-```text
-my-app/
-├── src/
-├── requirements.txt
-├── Dockerfile
-└── ...
-```
-
-A developer pushes a change:
-
-```text
-Developer
+docker-demo/
     │
-    │ git push
-    ▼
-Git repository
+    └── Dockerfile
+           │
+           │ docker build
+           ▼
+      my-nginx:1.0
 ```
 
-Jenkins checks out the repository:
-
-```text
-Git repository
-    │
-    ▼
-Jenkins
-```
-
-Then Jenkins can run:
+Check the image:
 
 ```bash
-docker build -t my-app:1.0 .
+docker images
 ```
 
-Docker reads the Dockerfile and builds the image.
+You should see something similar to:
 
 ```text
-Git
- │
- │ source + Dockerfile
- ▼
-Jenkins
- │
- │ docker build
- ▼
-Docker Image
- │
- │ docker push
- ▼
-Registry
+REPOSITORY   TAG   IMAGE ID
+my-nginx     1.0   xxxxxxxxx
 ```
-
-This is why a Dockerfile fits naturally into CI/CD.
-
-The CI server doesn't need a long list of manually remembered commands for building the application's environment.
-
-The build definition is stored in the repository.
 
 ---
 
-# 13. Dockerfile and Reproducibility
+# 5. From Image to Container
 
-Suppose you build an image today.
+Now use the image:
 
-Then tomorrow you need to build it again.
+```bash
+docker run -d --name my-nginx-container my-nginx:1.0
+```
 
-If the build process is represented by a Dockerfile:
+Check it:
+
+```bash
+docker ps
+```
+
+Now the complete process is:
+
+```text
+Dockerfile
+    │
+    │ docker build
+    ▼
+my-nginx:1.0
+    │
+    │ docker run
+    ▼
+my-nginx-container
+```
+
+This is the basic Docker workflow.
+
+---
+
+# 6. What Does `docker build` Mean?
+
+Consider:
+
+```bash
+docker build -t my-nginx:1.0 .
+```
+
+There are three important parts:
+
+### `docker build`
+
+Tells Docker:
+
+> Build an image.
+
+### `-t my-nginx:1.0`
+
+Gives the resulting image a name and tag.
+
+We'll study tags properly in **Part 8**.
+
+### `.`
+
+Specifies the **build context**.
+
+We'll study this in the **next part**.
+
+So for now:
+
+```text
+docker build -t my-nginx:1.0 .
+             │                │
+             │                └── Build context
+             └── Image name/tag
+```
+
+Don't worry about the `.` yet.
+
+---
+
+# 7. What Can a Dockerfile Define?
+
+A Dockerfile can contain instructions for things such as:
+
+```text
+Base environment
+Application files
+Dependencies
+Environment variables
+Working directory
+Startup command
+```
+
+For example:
 
 ```dockerfile
 FROM python:3.12
@@ -641,810 +281,295 @@ COPY requirements.txt .
 
 RUN pip install -r requirements.txt
 
-COPY . .
-
-CMD ["python", "app.py"]
-```
-
-you have a documented build process.
-
-The idea is:
-
-```text
-Same Dockerfile
-      +
-Same build inputs
-      ↓
-Same intended image build
-```
-
-There are additional factors affecting strict reproducibility, such as mutable dependencies and base-image references, but those are advanced topics.
-
-For now, the important idea is:
-
-> **A Dockerfile makes the image-building process explicit and repeatable instead of relying on someone's memory.**
-
----
-
-# 14. Dockerfile Is Not a Shell Script
-
-This is an important beginner misconception.
-
-A Dockerfile can contain commands that look like shell commands:
-
-```dockerfile
-RUN apt-get update
-RUN pip install flask
-```
-
-But a Dockerfile itself is **not simply a Bash script**.
-
-For example:
-
-```dockerfile
-WORKDIR /app
-```
-
-is a Dockerfile instruction.
-
-It's not a shell command.
-
-Similarly:
-
-```dockerfile
-COPY app.py /app/
-```
-
-is a Dockerfile instruction.
-
-Docker interprets it as part of the image-building process.
-
-So:
-
-```text
-Dockerfile
-    ≠
-Bash script
-```
-
-It is its own instruction language understood by Docker's build system.
-
----
-
-# 15. Beginner Misconception: Dockerfile = Image
-
-No.
-
-These are different things.
-
-### Dockerfile
-
-```text
-Text file
-```
-
-Example:
-
-```dockerfile
-FROM python:3.12
-COPY app.py /app/
-```
-
-### Image
-
-```text
-Built artifact
-```
-
-Example:
-
-```text
-my-app:1.0
-```
-
-### Container
-
-```text
-Running/created instance of the image
-```
-
-Example:
-
-```text
-my-app-container
-```
-
-The relationship is:
-
-```text
-Dockerfile
-    │
-    │ build
-    ▼
-Image
-    │
-    │ run
-    ▼
-Container
-```
-
----
-
-# 16. Beginner Misconception: `RUN` Happens When the Container Starts
-
-No.
-
-Consider:
-
-```dockerfile
-RUN pip install flask
-```
-
-That happens during:
-
-```bash
-docker build
-```
-
-not during:
-
-```bash
-docker run
-```
-
-Conceptually:
-
-```text
-docker build
-     │
-     ▼
-RUN pip install flask
-     │
-     ▼
-Flask included in image
-     │
-     │
-     │ later
-     ▼
-docker run
-     │
-     ▼
-Container starts
-```
-
-This distinction will become extremely important when we study image layers.
-
----
-
-# 17. Beginner Misconception: `CMD` Builds the Image
-
-Not exactly.
-
-Consider:
-
-```dockerfile
-CMD ["python", "app.py"]
-```
-
-The `CMD` instruction doesn't execute the application during the image build.
-
-Instead, it specifies the **default command for the container**.
-
-Conceptually:
-
-```text
-docker build
-     │
-     ▼
-Image stores CMD configuration
-     │
-     ▼
-docker run
-     │
-     ▼
-Default command starts
-```
-
-So:
-
-```text
-RUN  → build-time execution
-CMD  → runtime default
-```
-
----
-
-# 18. Beginner Misconception: Dockerfile Instructions Are Executed Once Forever
-
-Be careful with this mental model.
-
-A Dockerfile is used to **build an image**.
-
-The resulting image is then used to create containers.
-
-So the relationship is more like:
-
-```text
-Dockerfile
-    │
-    │ build
-    ▼
-Image
-    │
-    ├── Container 1
-    ├── Container 2
-    └── Container 3
-```
-
-You don't need to rebuild the image just because you want another container from it.
-
-You can create multiple containers from the same image.
-
----
-
-# 19. One Dockerfile Can Produce Different Image Versions
-
-Suppose your Dockerfile is:
-
-```dockerfile
-FROM python:3.12
-
-WORKDIR /app
-
-COPY . .
-
-CMD ["python", "app.py"]
-```
-
-You can build:
-
-```bash
-docker build -t my-app:1.0 .
-```
-
-Then later:
-
-```bash
-docker build -t my-app:1.1 .
-```
-
-The Dockerfile can be the same while the build inputs or source code have changed.
-
-Conceptually:
-
-```text
-Dockerfile + Build inputs
-          │
-          ▼
-       Image 1.0
-
-Later:
-
-Dockerfile + Updated inputs
-          │
-          ▼
-       Image 1.1
-```
-
-We'll learn more about the build inputs in **Step 3: Build Context**.
-
----
-
-# 20. A Small Hands-On Example
-
-Let's create the smallest useful example.
-
-Directory:
-
-```text
-dockerfile-demo/
-├── Dockerfile
-└── app.py
-```
-
-`app.py`:
-
-```python
-print("Hello from Docker")
-```
-
-Dockerfile:
-
-```dockerfile
-FROM python:3.12
-
-WORKDIR /app
-
 COPY app.py .
 
 CMD ["python", "app.py"]
 ```
 
-Build it:
-
-```bash
-docker build -t dockerfile-demo:1.0 .
-```
-
-Then run:
-
-```bash
-docker run --rm dockerfile-demo:1.0
-```
-
-You should get:
-
-```text
-Hello from Docker
-```
-
-Now let's understand what happened.
-
----
-
-# 21. What Happened During `docker build`?
-
-You ran:
-
-```bash
-docker build -t dockerfile-demo:1.0 .
-```
-
-Docker read:
-
-```dockerfile
-FROM python:3.12
-```
-
-and used the specified starting image.
-
-Then:
-
-```dockerfile
-WORKDIR /app
-```
-
-established the working directory.
-
-Then:
-
-```dockerfile
-COPY app.py .
-```
-
-put the application file into the image.
-
-Then:
-
-```dockerfile
-CMD ["python", "app.py"]
-```
-
-specified the default runtime command.
-
-The result was:
-
-```text
-dockerfile-demo:1.0
-```
-
----
-
-# 22. What Happened During `docker run`?
-
-You then executed:
-
-```bash
-docker run --rm dockerfile-demo:1.0
-```
-
-Docker used the image to create a container.
-
-The image contained the `CMD` configuration:
-
-```text
-python app.py
-```
-
-So the container started with that command.
-
-Conceptually:
-
-```text
-Image
-  │
-  │ docker run
-  ▼
-Container
-  │
-  ▼
-python app.py
-  │
-  ▼
-Hello from Docker
-```
-
-Notice something important:
-
-**The Dockerfile itself was not running inside the container.**
-
-The Dockerfile was used earlier to build the image.
-
----
-
-# 23. Dockerfile and Image Layers — Preview Only
-
-We are intentionally **not studying image layers yet**.
-
-But there is one relationship worth knowing.
-
-When Docker processes instructions such as:
-
-```dockerfile
-COPY app.py .
-RUN pip install flask
-```
-
-the resulting image is constructed from filesystem changes and metadata produced during the build.
-
-This is one reason Dockerfiles and image layers are closely connected.
-
-For now, simply remember:
-
-```text
-Dockerfile instructions
-        ↓
-Build operations
-        ↓
-Image
-```
-
-In **Step 4**, we'll open this up properly and understand how the resulting image is actually composed of layers.
-
----
-
-# 24. What About `FROM`?
-
-You will see this in almost every Dockerfile:
-
-```dockerfile
-FROM python:3.12
-```
-
-For now, understand only this:
-
-> `FROM` specifies the starting image for the build.
-
-Conceptually:
-
-```text
-Existing image
-      │
-      ▼
-Dockerfile build
-      │
-      ▼
-Your image
-```
-
-We will study **base images** properly in Step 7.
-
-So don't worry yet about:
-
-* where base images come from
-* how base images are constructed
-* minimal images
-* `scratch`
-* Alpine
-* Debian
-* distroless
-
-Those belong later.
-
----
-
-# 25. What About the `.` in `docker build`?
-
-You will repeatedly see:
-
-```bash
-docker build -t my-app:1.0 .
-```
-
-There is a `.` at the end.
-
-For now, **don't try to memorize what it means**.
-
-It is related to the files Docker makes available to the build.
-
-That's exactly what we'll study next:
-
-> **Step 3 — Build Context**
-
-So for now:
-
-```text
-docker build -t my-app:1.0 .
-                              ↑
-                         later topic
-```
-
-This deliberate separation is important.
-
-We don't want to mix the concepts prematurely.
-
----
-
-# 26. Core Dockerfile Instructions — Initial Map
-
-At this stage, you should have a basic map of the important instructions:
+Here we can already see several Dockerfile instructions:
 
 ```text
 FROM
-  ↓
-Starting point
-
 WORKDIR
-  ↓
-Working directory
-
 COPY
-  ↓
-Bring files into image
-
 RUN
-  ↓
-Perform build-time operation
-
-ENV
-  ↓
-Environment configuration
-
-EXPOSE
-  ↓
-Declare intended port
-
 CMD
-  ↓
-Default runtime command
-
-ENTRYPOINT
-  ↓
-Main runtime executable/behavior
 ```
 
-Later, we'll study them **one by one**, including:
+We will study them properly when we get to Dockerfile construction.
 
-* syntax
-* actual behavior
-* common mistakes
-* best practices
-* interaction with other instructions
-* CI/CD implications
+For now, the important concept is:
 
-Don't memorize them yet.
+> **A Dockerfile describes the steps/configuration Docker uses to produce an image.**
 
 ---
 
-# 27. Dockerfile in a Real Project
+# 8. Dockerfile and CI/CD
 
-A realistic application might look like:
+This is where Dockerfile becomes important for your actual learning goal.
+
+Suppose your repository contains:
 
 ```text
-payment-service/
+my-app/
 ├── src/
 ├── tests/
 ├── requirements.txt
-├── Dockerfile
-├── .gitignore
-└── README.md
+└── Dockerfile
 ```
 
-The Dockerfile becomes part of the project itself.
-
-Git tracks it:
+A developer pushes code:
 
 ```text
-Git repository
-     │
-     ├── application source
-     ├── tests
-     ├── requirements.txt
-     └── Dockerfile
-```
-
-Now every developer and CI server can use the same build definition.
-
-That is a major improvement over:
-
-```text
-"Ask Rahim how he built the production image."
-```
-
-Instead:
-
-```text
-"Read the Dockerfile."
-```
-
-That's the engineering value of treating infrastructure/build configuration as code.
-
----
-
-# 28. Why Dockerfile Matters So Much in CI/CD
-
-Now connect everything to your eventual pipeline.
-
-A simplified pipeline might be:
-
-```text
-Developer
-    │
-    │ git push
-    ▼
+Git push
+   │
+   ▼
 Git Repository
-    │
-    │ source + Dockerfile
-    ▼
-Jenkins
-    │
-    │ docker build
-    ▼
-Docker Image
-    │
-    │ docker push
-    ▼
-Registry
-    │
-    ▼
-Deployment
+   │
+   ▼
+CI Pipeline
 ```
 
-The Dockerfile is therefore sitting right in the middle of the **application-to-image** part of the CI pipeline.
-
-Later, you'll see something like:
+The CI pipeline can then execute:
 
 ```bash
-docker build \
-  -t registry.example.com/my-app:${BUILD_NUMBER} .
+docker build -t my-app:1.0 .
 ```
 
-The CI system supplies the build command.
+Result:
 
-But the Dockerfile defines **how the application becomes an image**.
+```text
+Git Repository
+      │
+      ▼
+CI Pipeline
+      │
+      │ docker build
+      ▼
+Docker Image
+```
+
+That image can later be pushed to a registry and deployed.
+
+We aren't studying the registry or deployment yet. Those belong to later phases.
+
+The key point is:
+
+> **The Dockerfile makes the image build reproducible and automatable.**
+
+The same Dockerfile can be used by:
+
+```text
+Developer machine
+CI server
+Build server
+```
+
+to define the image-building process.
 
 ---
 
-# 29. A Crucial Mental Model for CI/CD
+# 9. Important: Dockerfile Does Not Create the Container Directly
 
-Think of these as three separate things:
+A common misunderstanding is:
+
+> Dockerfile → Container
+
+The more accurate flow is:
+
+```text
+Dockerfile
+     │
+     │ BUILD
+     ▼
+Docker Image
+     │
+     │ RUN
+     ▼
+Docker Container
+```
+
+Therefore:
+
+```bash
+docker build
+```
+
+is primarily about **creating an image**.
+
+While:
+
+```bash
+docker run
+```
+
+is about **creating/starting a container from an image**.
+
+Keep those two operations separate in your mind.
+
+---
+
+# 10. Hands-on Exercise
+
+Let's verify the entire concept.
+
+### Step 1 — Create the directory
+
+```bash
+mkdir docker-demo
+cd docker-demo
+```
+
+### Step 2 — Create Dockerfile
+
+```bash
+vi Dockerfile
+```
+
+Add:
+
+```dockerfile
+FROM nginx
+```
+
+### Step 3 — Build the image
+
+```bash
+docker build -t my-nginx:1.0 .
+```
+
+### Step 4 — Verify the image
+
+```bash
+docker images
+```
+
+You should find:
+
+```text
+my-nginx   1.0
+```
+
+### Step 5 — Create a container
+
+```bash
+docker run -d --name my-nginx-container my-nginx:1.0
+```
+
+### Step 6 — Verify the container
+
+```bash
+docker ps
+```
+
+You should find:
+
+```text
+my-nginx-container
+```
+
+### Step 7 — Clean up
+
+```bash
+docker rm -f my-nginx-container
+docker rmi my-nginx:1.0
+```
+
+---
+
+# 11. One Important Observation
+
+Notice that we started with only:
+
+```dockerfile
+FROM nginx
+```
+
+Yet Docker produced an image.
+
+Why?
+
+Because `FROM nginx` tells Docker to start the image-building process from an existing image.
+
+This introduces an important concept:
+
+```text
+Existing Image
+      │
+      │ Dockerfile
+      ▼
+New Image
+```
+
+We'll eventually study **base images** in Part 7.
+
+For now, just recognize that Dockerfiles can build on top of existing images.
+
+---
+
+# 12. What You Should Understand Before Moving On
+
+You should now be comfortable with these statements:
+
+### 1.
+
+> A Dockerfile is a text file containing instructions for building an image.
+
+### 2.
+
+> `docker build` uses the Dockerfile to build an image.
+
+### 3.
+
+> The image is the build artifact.
+
+### 4.
+
+> `docker run` creates/starts a container from an image.
+
+### 5.
+
+> A Dockerfile is normally stored alongside the application source code in Git.
+
+### 6.
+
+> The same Dockerfile can be used by developers and CI systems to build the image consistently.
+
+The fundamental flow is:
 
 ```text
 Source Code
-    │
-    │ what developers write
-    ▼
+     +
 Dockerfile
-    │
-    │ how application becomes image
-    ▼
+     │
+     │ docker build
+     ▼
 Docker Image
-    │
-    │ deployable artifact
-    ▼
-Container
+     │
+     │ docker run
+     ▼
+Docker Container
 ```
-
-This distinction becomes very important later.
-
-For example:
-
-```text
-Git commit
-    ↓
-CI build
-    ↓
-Docker image
-    ↓
-Registry
-    ↓
-Kubernetes
-    ↓
-Container
-```
-
-The Dockerfile is the **bridge between application source and the container image**.
-
----
-
-# 30. Beginner Concepts vs Advanced Concepts
-
-At this point, you should understand:
-
-### Beginner concepts
-
-* What a Dockerfile is
-* Why it exists
-* `Dockerfile → docker build → Image`
-* `Image → docker run → Container`
-* Dockerfile instructions
-* Build-time vs runtime distinction
-* Basic purpose of `FROM`, `WORKDIR`, `COPY`, `RUN`, `ENV`, `EXPOSE`, `CMD`, `ENTRYPOINT`
-* Why Dockerfiles are useful for reproducible builds
-* Why Dockerfiles belong in source control
-* Why Dockerfiles are important to CI/CD
-
-### Don't worry about these yet
-
-We will deliberately postpone:
-
-* Build context
-* `.dockerignore`
-* Image layers
-* Build cache
-* Multi-stage builds
-* BuildKit
-* Base-image internals
-* Image registries
-* Tags and digests
-* Image optimization
-* Security scanning
-* SBOM
-* Image signing
-* Advanced `ENTRYPOINT`/`CMD` behavior
-
-Those concepts have their own places in the roadmap.
-
----
-
-# 31. The One-Sentence Takeaway
-
-If you remember only one thing from this entire topic:
-
-> **A Dockerfile is a version-controlled set of instructions that Docker's build system uses to construct a Docker image and define important aspects of how containers created from that image should behave.**
-
-The core relationship is:
-
-```text
-                 Dockerfile
-              "How to build"
-                     │
-                     │ docker build
-                     ▼
-                 Docker Image
-               "What was built"
-                     │
-                     │ docker run
-                     ▼
-                  Container
-                 "What runs"
-```
-
-And this is the foundation we'll build on throughout the rest of Phase 1.
 
 ---
 
 # Phase 1 Progress
 
 ```text
+Phase 1 — Docker Fundamentals
+
 01. Container vs Image       ✅
 02. Dockerfile               ✅
-03. Build context            ← NEXT
-04. Docker image layers
-05. Docker image registry
-06. Container filesystem
-07. Base images
-08. Image tags
+03. Build Context             ← NEXT
+04. Docker Image Layers
+05. Docker Image Registry
+06. Container Filesystem
+07. Base Images
+08. Image Tags
 ```
 
-The **next topic is Build Context**.
+**Next: Part 3 — Build Context.**
 
-And this time, when we see:
+And this time we'll specifically answer the question:
 
-```bash
-docker build -t my-app:1.0 .
-```
-
-we'll finally answer the question we intentionally postponed:
-
-> **What exactly does that `.` mean, what files does Docker actually send/use during the build, and why does Docker need a build context at all?**
+> **What exactly does the `.` mean in `docker build -t my-app:1.0 .`, and what files does Docker actually send/use during a build?**

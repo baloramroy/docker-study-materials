@@ -1,1505 +1,1214 @@
-# Phase 1 — Part 7: Docker Base Images
+# Phase 1 — Part 8: Docker Image Tags
 
-We are now moving to:
+## Where we are
 
 ```text
+Phase 1 — Docker Fundamentals
+
 01. Container vs Image       ✅
 02. Dockerfile               ✅
-03. Build context            ✅
-04. Docker image layers      ✅
-05. Docker image registry    ✅
-06. Container filesystem     ✅
-07. Base images              ← NOW
-08. Image tags
+03. Build Context            ✅
+04. Docker Image Layers      ✅
+05. Docker Image Registry    ✅
+06. Container Filesystem     ✅
+07. Base Images              ✅
+08. Image Tags               ← NOW
 ```
 
-This is a very important step because it answers the question we ended Step 6 with:
+This is the **final topic of Phase 1**.
 
-> **Where does the initial filesystem inside a Docker image come from?**
+Image tags look simple:
 
-The answer starts with one Dockerfile instruction:
-
-```dockerfile
-FROM
+```text
+nginx:1.27
 ```
+
+but they are extremely important in CI/CD because tags are how we commonly identify, publish, promote, and deploy image versions.
 
 ---
 
-# 1. Start with the basic concept
+# 1. What Is an Image Tag?
 
-Look at this Dockerfile:
-
-```dockerfile
-FROM ubuntu:24.04
-
-COPY app.py /app/app.py
-```
-
-The first line says:
-
-```dockerfile
-FROM ubuntu:24.04
-```
-
-This means:
-
-> **Start building my new image from the existing `ubuntu:24.04` image.**
-
-So instead of creating the entire filesystem from nothing, Docker starts with an existing image.
-
-Conceptually:
-
-```text
-ubuntu:24.04
-      |
-      | FROM
-      v
-Your image
-```
-
-That existing image is the **base image** for your build.
-
----
-
-# 2. Why do we need a base image?
-
-Remember the container filesystem from Step 6.
-
-A typical Linux container filesystem looks something like:
-
-```text
-/
-├── bin/
-├── dev/
-├── etc/
-├── home/
-├── lib/
-├── usr/
-├── var/
-└── ...
-```
-
-Creating all of that manually would be ridiculous.
-
-Instead, Docker can start from an existing filesystem:
-
-```text
-Ubuntu image
-      |
-      v
-Base filesystem
-      |
-      +-- your application
-      +-- your dependencies
-      +-- your configuration
-```
-
-So a base image gives your Docker build a starting point.
-
----
-
-# 3. The mental model
-
-Think of a base image as the **foundation of your image**.
+A **tag is a human-readable name attached to an image reference**.
 
 For example:
 
 ```text
-             Your Application Image
-                     │
-          ┌──────────┴──────────┐
-          │ Your application    │
-          ├─────────────────────┤
-          │ Your dependencies   │
-          ├─────────────────────┤
-          │ Ubuntu base image   │
-          └─────────────────────┘
+nginx:1.27
 ```
 
-Or:
+can be understood as:
 
 ```text
-Base Image
-    ↓
-Add dependencies
-    ↓
-Add application
-    ↓
-Add configuration
-    ↓
-Your final image
+nginx
+  │
+  └── repository
+
+1.27
+  │
+  └── tag
 ```
 
-This is very similar to building a house.
+Another example:
 
 ```text
-Foundation
-    ↓
-Structure
-    ↓
-Rooms
-    ↓
-Furniture
+mycompany/payment-service:2.4.1
 ```
 
-The base image is the foundation.
+means:
+
+```text
+mycompany/payment-service
+        │
+        └── repository
+
+2.4.1
+        │
+        └── tag
+```
+
+A tag makes it easier for humans and tools to refer to an image.
 
 ---
 
-# 4. `FROM` is the key instruction
+# 2. Image Reference Structure
+
+Let's build up a complete reference.
 
 Consider:
 
-```dockerfile
-FROM ubuntu:24.04
+```text
+registry.example.com/myteam/payment-service:2.4.1
 ```
 
-The syntax is:
+Conceptually:
 
 ```text
-FROM <image>
+registry.example.com
+        │
+        └── Registry
+
+myteam/payment-service
+        │
+        └── Repository
+
+2.4.1
+        │
+        └── Tag
+```
+
+So a common image reference looks like:
+
+```text
+[registry/]repository[:tag]
 ```
 
 For example:
 
-```dockerfile
-FROM ubuntu
+```text
+nginx:1.27
 ```
 
 or:
 
-```dockerfile
-FROM ubuntu:24.04
+```text
+docker.io/myuser/myapp:1.0
 ```
 
 or:
 
-```dockerfile
-FROM python:3.12
+```text
+harbor.example.com/devops/myapp:2026.08.24
 ```
-
-or:
-
-```dockerfile
-FROM node:22
-```
-
-or:
-
-```dockerfile
-FROM alpine:3.22
-```
-
-Each one says:
-
-> Start this image build from the specified existing image.
 
 ---
 
-# 5. Example: Ubuntu base image
+# 3. What Happens If You Don't Specify a Tag?
 
-Suppose you write:
+Suppose you run:
 
-```dockerfile
-FROM ubuntu:24.04
-
-RUN apt-get update
-RUN apt-get install -y nginx
+```bash
+docker pull nginx
 ```
+
+You didn't explicitly provide a tag.
+
+Docker uses:
+
+```text
+nginx:latest
+```
+
+as the default tag in the normal case.
+
+So:
+
+```bash
+docker pull nginx
+```
+
+is effectively equivalent to:
+
+```bash
+docker pull nginx:latest
+```
+
+This is convenient for learning and interactive use.
+
+But it introduces an important CI/CD concern.
+
+---
+
+# 4. Why `latest` Can Be Dangerous
+
+Imagine your deployment uses:
+
+```text
+myapp:latest
+```
+
+Today:
+
+```text
+latest → Version A
+```
+
+Tomorrow:
+
+```text
+latest → Version B
+```
+
+The deployment reference didn't change:
+
+```text
+myapp:latest
+```
+
+but the actual image behind that tag did.
 
 Conceptually:
 
 ```text
-ubuntu:24.04
-      │
-      │ base
-      ▼
-+----------------+
-| Ubuntu         |
-+----------------+
-      │
-      │ RUN apt
-      ▼
-+----------------+
-| Ubuntu + nginx |
-+----------------+
+Day 1
+
+myapp:latest
+      ↓
+   Version A
+
+
+Day 2
+
+myapp:latest
+      ↓
+   Version B
 ```
 
-Your final image is no longer simply Ubuntu.
+Therefore:
 
-It is:
+> **A tag is a mutable reference. It should not automatically be assumed to permanently identify one specific image.**
 
-```text
-Ubuntu base
-+
-nginx
-```
+This is one of the most important lessons for CI/CD.
 
 ---
 
-# 6. Example: Python base image
-
-Now consider:
-
-```dockerfile
-FROM python:3.12
-
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY app.py /app/app.py
-```
-
-The base image already provides a Python environment.
-
-Conceptually:
-
-```text
-python:3.12
-     |
-     +-- Linux filesystem
-     +-- Python
-     +-- Python runtime environment
-     |
-     v
-Install dependencies
-     |
-     v
-Copy application
-     |
-     v
-Final application image
-```
-
-This is extremely common.
-
-Instead of manually doing:
-
-```text
-Install Linux
-Install Python
-Configure Python
-Install pip
-...
-```
-
-you start with:
-
-```dockerfile
-FROM python:3.12
-```
-
-and build from there.
-
----
-
-# 7. Example: Node.js
-
-For a Node.js application:
-
-```dockerfile
-FROM node:22
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm install
-
-COPY . .
-
-CMD ["npm", "start"]
-```
-
-The base image provides the environment needed to run Node.js.
-
-Conceptually:
-
-```text
-node:22
-   ↓
-Node.js environment
-   ↓
-npm dependencies
-   ↓
-application code
-   ↓
-your final image
-```
-
----
-
-# 8. So what exactly is a base image?
-
-A base image is simply:
-
-> **The image specified as the starting point of another image build.**
-
-For example:
-
-```dockerfile
-FROM python:3.12
-```
-
-Here:
-
-```text
-python:3.12
-```
-
-is the base image.
-
-If you write:
-
-```dockerfile
-FROM ubuntu:24.04
-```
-
-then:
-
-```text
-ubuntu:24.04
-```
-
-is the base image.
-
-If you write:
-
-```dockerfile
-FROM node:22
-```
-
-then:
-
-```text
-node:22
-```
-
-is the base image.
-
-The term is **relative to your build**.
-
----
-
-# 9. A very important distinction
-
-Don't think:
-
-> "A base image is always Ubuntu."
-
-No.
-
-Ubuntu is just one possible base.
-
-You can have:
-
-```text
-Ubuntu
-Debian
-Alpine
-Rocky Linux
-Amazon Linux
-Python
-Node
-Java
-Nginx
-...
-```
-
-as starting points.
-
-And there's an even deeper concept:
-
-> **A base image doesn't necessarily have to be a traditional Linux distribution image.**
-
-We'll get there shortly.
-
----
-
-# 10. Base image vs final image
+# 5. Tags Do Not Create New Images
 
 Suppose:
 
-```dockerfile
-FROM ubuntu:24.04
-
-RUN apt-get update && apt-get install -y nginx
-
-COPY index.html /var/www/html/
-```
-
-Here:
-
-```text
-ubuntu:24.04
-```
-
-is the **base image**.
-
-The resulting image:
-
-```text
-my-web-server:1.0
-```
-
-is your **final image**.
-
-So:
-
-```text
-Base Image
-    +
-Dockerfile instructions
-    =
-Final Image
-```
-
-More specifically:
-
-```text
-ubuntu:24.04
-      |
-      +-- RUN apt install nginx
-      |
-      +-- COPY index.html
-      |
-      v
-my-web-server:1.0
-```
-
----
-
-# 11. Base images and image layers
-
-Now we can connect this directly to Step 4.
-
-Suppose the base image contains:
-
-```text
-ubuntu:24.04
-
-Layer 3
-Layer 2
-Layer 1
-```
-
-Your Dockerfile says:
-
-```dockerfile
-FROM ubuntu:24.04
-
-RUN apt-get update
-RUN apt-get install -y nginx
-
-COPY index.html /var/www/html/
-```
-
-Docker builds additional layers on top:
-
-```text
-Your final image
-
-Layer 6 → COPY index.html
-Layer 5 → install nginx
-Layer 4 → apt update
-Layer 3 → Ubuntu base
-Layer 2 → Ubuntu base
-Layer 1 → Ubuntu base
-```
-
-So:
-
-```text
-Base image layers
-        +
-Your new layers
-        =
-Final image
-```
-
-This is why understanding image layers **before** base images was important.
-
----
-
-# 12. The `FROM` instruction is therefore more important than it looks
-
-When you see:
-
-```dockerfile
-FROM ubuntu:24.04
-```
-
-don't think only:
-
-> "Use Ubuntu."
-
-Think:
-
-```text
-Find the referenced image
-        ↓
-Use its filesystem/layers as the starting point
-        ↓
-Apply my Dockerfile instructions
-        ↓
-Create new layers
-        ↓
-Produce my final image
-```
-
-That's the deeper meaning.
-
----
-
-# 13. Where does Docker get the base image?
-
-Suppose you write:
-
-```dockerfile
-FROM ubuntu:24.04
-```
-
-Where does Docker find it?
-
-Docker first needs the image locally or needs to obtain it from a registry.
-
-Conceptually:
-
-```text
-Dockerfile
-    |
-    v
-FROM ubuntu:24.04
-    |
-    v
-Do I have this image locally?
-    |
-   no
-    |
-    v
-Pull from registry
-    |
-    v
-Ubuntu image available locally
-    |
-    v
-Continue build
-```
-
-This connects directly to Step 5.
-
-Remember:
-
-```text
-Registry
-    |
-    | pull
-    v
-Base image
-    |
-    v
-Docker build
-```
-
-So registries are also extremely important for base images.
-
----
-
-# 14. Example of a first build
-
-Suppose you have:
-
-```dockerfile
-FROM ubuntu:24.04
-
-RUN apt-get update
-RUN apt-get install -y curl
-```
-
-You run:
-
 ```bash
-docker build -t my-ubuntu:1.0 .
+docker build -t myapp:1.0 .
 ```
-
-If `ubuntu:24.04` isn't available locally, Docker needs to retrieve it.
-
-Conceptually:
-
-```text
-                  Registry
-                     |
-                     | pull
-                     v
-              ubuntu:24.04
-                     |
-                     v
-                Docker Build
-                     |
-                     v
-              my-ubuntu:1.0
-```
-
-This is something you'll see in real life when running `docker build`.
-
----
-
-# 15. Why not build everything from scratch?
-
-You could theoretically construct an image filesystem yourself.
-
-But normally you don't want to.
-
-Imagine creating:
-
-```text
-/etc
-/usr
-/bin
-/lib
-...
-```
-
-and manually installing everything needed.
-
-Instead:
-
-```dockerfile
-FROM ubuntu:24.04
-```
-
-gives you a known starting point.
 
 Then:
 
-```dockerfile
-RUN ...
-COPY ...
-ENV ...
-WORKDIR ...
-CMD ...
+```bash
+docker tag myapp:1.0 myapp:stable
 ```
 
-customize it.
-
-This provides:
-
-* faster development
-* standardized environments
-* reusable foundations
-* easier maintenance
-* predictable builds
-
----
-
-# 16. A very important concept: base image inheritance
-
-Images can effectively build on other images.
-
-For example:
+You now have:
 
 ```text
-ubuntu
-   ↓
-python image
-   ↓
-your application image
+myapp:1.0
+myapp:stable
 ```
+
+It may look like two images:
+
+```text
+myapp:1.0
+myapp:stable
+```
+
+but both references can point to the **same underlying image**.
 
 Conceptually:
 
 ```text
-Ubuntu
-  |
-  v
-Python environment
-  |
-  v
-Your application
+              ┌── myapp:1.0
+              │
+Docker Image ─┤
+              │
+              └── myapp:stable
 ```
 
-Or:
+`docker tag` doesn't rebuild the image.
 
-```text
-Debian
-  |
-  v
-Python
-  |
-  v
-Django application
-```
-
-Your application image doesn't need to independently recreate everything underneath.
-
-It builds on the layers already provided by its base.
+It gives the image another reference.
 
 ---
 
-# 17. `python` is not necessarily a Linux distribution
+# 6. Hands-on Exercise — Multiple Tags
 
-This is an important beginner point.
-
-When you see:
-
-```dockerfile
-FROM python:3.12
-```
-
-you might think:
-
-> "Python is the base operating system."
-
-No.
-
-The Python image itself is built on top of another underlying image.
-
-Conceptually:
-
-```text
-Your Django image
-        |
-        v
-python:3.12
-        |
-        v
-Debian / another base
-        |
-        v
-Underlying filesystem
-```
-
-The exact underlying base depends on the specific Python image variant.
-
-So image inheritance can form a chain.
-
----
-
-# 18. Base image chains
-
-Imagine:
-
-```text
-Your application
-       |
-       v
-python:3.12
-       |
-       v
-debian
-       |
-       v
-base filesystem
-```
-
-Your final image therefore indirectly inherits the lower layers.
-
-You can think of it as:
-
-```text
-Application layers
-       ↓
-Python layers
-       ↓
-Debian layers
-       ↓
-Base filesystem
-```
-
-This is why a seemingly simple:
-
-```dockerfile
-FROM python:3.12
-```
-
-can bring in quite a lot of existing image content.
-
----
-
-# 19. What is a "minimal" base image?
-
-You will often hear:
-
-> "Use a minimal base image."
-
-This means the image contains only what is reasonably necessary for its purpose.
-
-For example, you may encounter:
-
-```text
-Ubuntu
-Debian slim
-Alpine
-Distroless
-Scratch
-```
-
-They represent different approaches to how much environment you include.
-
-Conceptually:
-
-```text
-More general
-      │
-      v
-Ubuntu
-      ↓
-Debian slim
-      ↓
-Alpine
-      ↓
-Distroless
-      ↓
-Scratch
-      │
-      v
-More minimal
-```
-
-This is simplified because these are not simply points on one universal scale, but it's useful as an initial mental model.
-
----
-
-# 20. Why would you want a smaller base?
-
-Suppose:
-
-```text
-Image A = 1.2 GB
-Image B = 180 MB
-```
-
-If both provide everything your application actually needs, the smaller image can have advantages:
-
-* faster image pulls
-* faster deployments
-* less storage
-* smaller attack surface
-* potentially faster CI/CD pipelines
-
-For example:
-
-```text
-CI
- ↓
-Build image
- ↓
-Push image
- ↓
-Registry
- ↓
-Kubernetes pulls image
-```
-
-A smaller image can reduce the amount of data moved through that pipeline.
-
-But:
-
-> **Smaller is not automatically better.**
-
-This is an important point.
-
----
-
-# 21. Beginner misconception: "Smallest image is always best"
-
-Not necessarily.
-
-Suppose you choose an extremely minimal image but your application needs:
-
-```text
-shell
-certificates
-debugging tools
-runtime libraries
-system utilities
-```
-
-You may make development and troubleshooting much harder.
-
-So the real goal is:
-
-> **Use an appropriately minimal image that contains everything the application actually needs.**
-
-Not:
-
-> "Make the image as tiny as possible at any cost."
-
----
-
-# 22. Ubuntu vs Alpine
-
-You'll often see comparisons like:
-
-```dockerfile
-FROM ubuntu:24.04
-```
-
-versus:
-
-```dockerfile
-FROM alpine:3.22
-```
-
-The important point isn't simply:
-
-```text
-Ubuntu = big
-Alpine = small
-```
-
-There are deeper differences involving:
-
-* package managers
-* libc implementation
-* available system utilities
-* compatibility
-* debugging experience
-* application dependencies
-
-For example, Alpine commonly uses:
-
-```text
-musl libc
-```
-
-where many traditional Linux environments use:
-
-```text
-glibc
-```
-
-This can matter for some applications and binaries.
-
-We don't need to go deep into that yet.
-
----
-
-# 23. `scratch` — the special case
-
-You may eventually see:
-
-```dockerfile
-FROM scratch
-```
-
-This is very different.
-
-`scratch` is an empty starting point.
-
-Conceptually:
-
-```text
-FROM scratch
-      |
-      v
-Nothing
-      |
-      +-- your application files
-      |
-      v
-Final image
-```
-
-There isn't a normal Linux distribution environment sitting underneath it.
-
-This is useful for certain applications, particularly statically compiled applications such as some Go programs.
-
-For example, conceptually:
-
-```dockerfile
-FROM scratch
-
-COPY my-app /my-app
-
-ENTRYPOINT ["/my-app"]
-```
-
-The resulting image can be extremely minimal.
-
-But don't jump to `scratch` just because it's small.
-
-It can make debugging and runtime functionality more difficult.
-
----
-
-# 24. What is a "base image" really?
-
-Here's a subtle but important distinction.
-
-People often casually say:
-
-> "Ubuntu is a base image."
-
-That's fine.
-
-But technically, **any image can serve as the base for another image**.
-
-For example:
-
-```dockerfile
-FROM my-company-base:1.0
-```
-
-Now:
-
-```text
-my-company-base:1.0
-```
-
-is the base image for your new image.
-
-So a base image isn't necessarily something special created by Docker.
-
-It's simply:
-
-> **The starting image referenced by `FROM`.**
-
----
-
-# 25. Company base images
-
-This becomes very important in production environments.
-
-A company might create:
-
-```text
-company/java-base:21
-```
-
-which contains:
-
-```text
-Linux base
-+
-Java 21
-+
-CA certificates
-+
-timezone configuration
-+
-security configuration
-+
-company standards
-```
-
-Application teams then use:
-
-```dockerfile
-FROM company/java-base:21
-
-COPY application.jar /app/application.jar
-
-CMD ["java", "-jar", "/app/application.jar"]
-```
-
-Now many applications share the same organizational foundation.
-
-Conceptually:
-
-```text
-                company/java-base:21
-                    /     |     \
-                   /      |      \
-                  v       v       v
-              App A    App B    App C
-```
-
-This is a very common enterprise pattern.
-
----
-
-# 26. Base image and security
-
-Base images are also a security concern.
-
-Suppose your application uses:
-
-```dockerfile
-FROM some-old-image
-```
-
-and that base image contains vulnerable packages.
-
-Your application image inherits those vulnerabilities.
-
-Conceptually:
-
-```text
-Vulnerable base image
-        |
-        v
-Your application image
-        |
-        v
-Potential vulnerabilities
-```
-
-Therefore production teams need to:
-
-* choose trusted base images
-* keep them updated
-* scan images
-* track vulnerabilities
-* rebuild applications when base images receive security updates
-
-This connects directly to tools such as **Trivy**, which you'll eventually use in your CI/CD pipeline.
-
----
-
-# 27. Base image updates don't automatically update your image
-
-This is an important CI/CD concept.
-
-Suppose today you build:
-
-```dockerfile
-FROM python:3.12
-```
-
-Your resulting image contains the base image content that existed when you built it.
-
-If the `python:3.12` image later gets updated, your already-built image does **not magically change**.
-
-You need to rebuild.
-
-Conceptually:
-
-```text
-Old build
-    |
-    v
-my-app:1.0
-    |
-    X
-doesn't automatically change
-```
-
-Later:
-
-```text
-Updated base image
-        |
-        v
-docker build
-        |
-        v
-new application image
-```
-
-This is one reason CI/CD pipelines frequently rebuild images.
-
----
-
-# 28. The base image is part of your supply chain
-
-Think about your Dockerfile:
-
-```dockerfile
-FROM python:3.12
-```
-
-You may have written only one line, but you're depending on:
-
-```text
-python:3.12
-    ↓
-underlying base
-    ↓
-OS packages
-    ↓
-libraries
-    ↓
-your application
-```
-
-So your application image isn't only your own code.
-
-It contains a chain of dependencies.
-
-This is called part of the **software supply chain**.
-
-Later, when we study:
-
-```text
-Trivy
-SBOM
-image signing
-image provenance
-```
-
-this will become much more important.
-
----
-
-# 29. What Docker is actually doing during `FROM`
-
-Let's make the entire process concrete.
-
-Suppose:
-
-```dockerfile
-FROM python:3.12
-
-COPY app.py /app/app.py
-```
-
-You execute:
+Build:
 
 ```bash
-docker build -t my-app:1.0 .
+docker build -t tag-demo:1.0 .
 ```
 
-Conceptually:
-
-```text
-Step 1
-Docker reads:
-FROM python:3.12
-
-        ↓
-
-Step 2
-Docker finds python:3.12 locally
-or pulls it from a registry
-
-        ↓
-
-Step 3
-Docker uses the base image layers
-
-        ↓
-
-Step 4
-Docker processes:
-COPY app.py /app/app.py
-
-        ↓
-
-Step 5
-Docker creates another image layer
-
-        ↓
-
-Step 6
-Final image:
-my-app:1.0
-```
-
-So:
-
-```text
-python:3.12
-       +
-COPY app.py
-       =
-my-app:1.0
-```
-
----
-
-# 30. The complete mental model of base images
-
-At this point, you should be able to visualize:
-
-```text
-                 REGISTRY
-                    |
-                    | pull
-                    v
-             Base Image
-            python:3.12
-                    |
-                    v
-          ┌─────────────────┐
-          │ Base layers     │
-          │                 │
-          │ Linux filesystem│
-          │ Python runtime  │
-          │ etc.            │
-          └─────────────────┘
-                    |
-             Dockerfile
-                    |
-             COPY / RUN ...
-                    |
-                    v
-          ┌─────────────────┐
-          │ Your new layers │
-          └─────────────────┘
-                    |
-                    v
-             Final Image
-                    |
-                    v
-                Container
-```
-
-This connects Steps 4, 5, 6, and 7 together.
-
----
-
-# 31. Hands-on exercise
-
-Let's make this concrete.
-
-Create a simple Dockerfile:
-
-```dockerfile
-FROM ubuntu:24.04
-
-RUN apt-get update && \
-    apt-get install -y curl
-
-CMD ["bash"]
-```
-
-Build it:
-
-```bash
-docker build -t base-demo:1.0 .
-```
-
-Then inspect:
+Check:
 
 ```bash
 docker images
 ```
 
-Run it:
+Then:
 
 ```bash
-docker run -it base-demo:1.0
+docker tag tag-demo:1.0 tag-demo:stable
 ```
 
-Inside:
+Check again:
 
 ```bash
-curl --version
+docker images
 ```
 
-You should see that `curl` is available.
-
-Why?
-
-Because:
+You may see:
 
 ```text
-ubuntu:24.04
-       ↓
-RUN apt install curl
-       ↓
-base-demo:1.0
+REPOSITORY   TAG
+tag-demo     1.0
+tag-demo     stable
 ```
 
-The base image supplied the initial filesystem, and your Dockerfile added another layer containing the changes.
+Now inspect the image IDs:
+
+```bash
+docker images tag-demo
+```
+
+You'll see that the tags can reference the same image ID.
+
+This demonstrates:
+
+```text
+Two tags
+   ↓
+Same image
+```
 
 ---
 
-# 32. One more useful experiment
+# 7. Tags Are Often Used for Versioning
 
-Run:
+A common practice is to give images application versions.
 
-```bash
-docker history base-demo:1.0
+For example:
+
+```text
+payment-service:1.0.0
+payment-service:1.1.0
+payment-service:2.0.0
 ```
 
-This is a useful command for connecting today's lesson to our previous **image layers** lesson.
+This makes the image reference meaningful:
 
-You'll see the history of the image layers/instructions.
+```text
+payment-service:1.0.0
+             ↓
+       application version
+```
+
+A CI pipeline might produce:
+
+```text
+Build #101 → payment-service:1.0.0
+Build #102 → payment-service:1.0.1
+Build #103 → payment-service:1.0.2
+```
+
+This is much easier to reason about than repeatedly overwriting:
+
+```text
+payment-service:latest
+```
+
+---
+
+# 8. Common CI/CD Tagging Strategies
+
+There isn't one universal tagging strategy.
+
+You'll encounter several.
+
+### Version tag
+
+```text
+myapp:1.4.2
+```
+
+Good for release versions.
+
+---
+
+### Git commit/tag
+
+```text
+myapp:a83f91c
+```
+
+The tag can represent a Git commit.
+
+This provides a direct relationship:
+
+```text
+Git commit
+    ↓
+Docker image
+```
+
+---
+
+### CI build number
+
+```text
+myapp:build-105
+```
+
+Useful for identifying exactly which pipeline build produced the image.
+
+---
+
+### Environment tag
+
+```text
+myapp:dev
+myapp:staging
+myapp:production
+```
+
+These can be useful, but remember that these tags can move.
+
+For example:
+
+```text
+production
+    ↓
+Version 10
+
+later
+
+production
+    ↓
+Version 11
+```
+
+So environment tags should not automatically be treated as immutable version identifiers.
+
+---
+
+# 9. One Image Can Have Many Tags
+
+Suppose we have one image:
+
+```text
+Image X
+```
+
+It could have:
+
+```text
+myapp:1.5.0
+myapp:stable
+myapp:production
+```
+
+all pointing to the same image.
 
 Conceptually:
 
 ```text
-base-demo:1.0
-       |
-       +-- CMD
-       +-- RUN apt install curl
-       +-- FROM ubuntu
+                    ┌── myapp:1.5.0
+                    │
+Image X ────────────┼── myapp:stable
+                    │
+                    └── myapp:production
 ```
 
-This helps you see that your final image is built from an existing image plus your additional build steps.
+This is useful when promoting an image through environments.
+
+For example:
+
+```text
+Build
+  ↓
+myapp:1.5.0
+  ↓
+Testing
+  ↓
+Stable
+  ↓
+Production
+```
+
+But again, the tags such as `stable` and `production` can be moved to another image later.
 
 ---
 
-# 33. Beginner concepts vs advanced concepts
+# 10. Tag vs Image ID
 
-### You should understand now
+Now we need to distinguish another term.
 
-You should be comfortable with:
+Run:
 
-* `FROM` specifies the starting image.
-* That starting image is the base image.
-* The base image provides the initial filesystem/layers.
-* Your Dockerfile adds new layers on top.
-* Base images can come from registries.
-* A base image can itself be based on another image.
-* `python`, `node`, etc. images aren't necessarily operating systems themselves.
-* Smaller images can be useful, but smallest isn't automatically best.
-* `scratch` is an empty starting point.
-* Base images affect your application's security and dependency chain.
-* Updating a base image requires rebuilding your application image to incorporate the update.
+```bash
+docker images
+```
 
-### Advanced — leave for later
+You might see:
 
-Don't worry about these yet:
+```text
+REPOSITORY   TAG    IMAGE ID
+myapp        1.0    abc123...
+```
 
-* OCI image specification
-* manifest lists
-* multi-architecture images
-* digest pinning
-* reproducible base-image builds
-* distroless internals
-* glibc vs musl details
-* package-layer optimization
-* image provenance
-* SBOM generation
-* cosign/signatures
-* base-image lifecycle management
+Here:
 
-We'll encounter these naturally later.
+```text
+myapp:1.0
+```
+
+is a human-friendly image reference.
+
+```text
+abc123...
+```
+
+is the local Docker **image ID**.
+
+These are not the same thing.
+
+Conceptually:
+
+```text
+myapp:1.0
+    │
+    └── tag/reference
+          │
+          ▼
+      Image object
+          │
+          └── Image ID
+```
+
+The image ID identifies the local image object in Docker's image store.
 
 ---
 
-# 34. The one sentence to remember
+# 11. Tag vs Digest
 
-If you remember only one thing from Step 7:
+This distinction is even more important.
 
-> **A base image is the starting image specified by `FROM`; Docker uses its existing filesystem/layers as the foundation and adds your Dockerfile's changes on top to create the final image.**
+An image can be referenced using a tag:
 
-The complete progression is now:
+```text
+myapp:1.0
+```
+
+or by digest:
+
+```text
+myapp@sha256:abcdef123...
+```
+
+Think of them as:
+
+```text
+Tag
+ │
+ └── human-friendly, mutable reference
+
+
+Digest
+ │
+ └── content-addressed identity
+```
+
+A digest looks something like:
+
+```text
+sha256:9f2c...
+```
+
+The full digest is much longer.
+
+---
+
+# 12. Why Digests Matter
+
+Suppose:
+
+```text
+myapp:production
+```
+
+currently points to:
+
+```text
+Image A
+```
+
+Later someone updates the tag:
+
+```text
+myapp:production
+        ↓
+     Image B
+```
+
+If you deploy using:
+
+```text
+myapp:production
+```
+
+you may get a different image at a later time.
+
+But if you deploy using:
+
+```text
+myapp@sha256:...
+```
+
+you're identifying a specific image manifest by its digest.
+
+This is much better for reproducibility.
+
+Conceptually:
+
+```text
+Tag:
+
+myapp:production
+       ↓
+     Image ?
+       ↓
+can change
+
+
+Digest:
+
+myapp@sha256:ABC...
+       ↓
+specific content
+```
+
+---
+
+# 13. Tag vs Digest vs Image ID
+
+This is worth memorizing.
+
+| Concept  | Example               | Purpose                       |
+| -------- | --------------------- | ----------------------------- |
+| Tag      | `myapp:1.0`           | Human-friendly reference      |
+| Digest   | `myapp@sha256:abc...` | Content-based image identity  |
+| Image ID | `abc123...`           | Local Docker image identifier |
+
+The important distinction is:
+
+```text
+Tag
+  ↓
+Can move
+
+
+Digest
+  ↓
+Identifies specific content
+
+
+Image ID
+  ↓
+Local Docker image-store identifier
+```
+
+---
+
+# 14. How Tags Work With a Registry
+
+Suppose you build:
+
+```bash
+docker build -t myapp:1.0 .
+```
+
+Then you tag it for your registry:
+
+```bash
+docker tag myapp:1.0 \
+  registry.example.com/team/myapp:1.0
+```
+
+Then:
+
+```bash
+docker push registry.example.com/team/myapp:1.0
+```
+
+The flow becomes:
+
+```text
+Local Image
+     │
+     ├── myapp:1.0
+     │
+     └── registry.example.com/team/myapp:1.0
+                    │
+                    │ push
+                    ▼
+                 Registry
+```
+
+Again, tagging does not mean rebuilding.
+
+---
+
+# 15. A CI/CD Example
+
+Suppose Jenkins builds commit:
+
+```text
+a83f91c
+```
+
+The pipeline could create:
+
+```text
+myapp:a83f91c
+```
+
+and perhaps:
+
+```text
+myapp:build-105
+```
+
+After testing, the same image could receive:
+
+```text
+myapp:production
+```
+
+Conceptually:
+
+```text
+                    ┌── myapp:a83f91c
+                    │
+Built Image ────────┼── myapp:build-105
+                    │
+                    └── myapp:production
+```
+
+All three could point to the same image.
+
+This creates a useful separation:
+
+```text
+Version/identity tag
+        +
+Environment tag
+```
+
+For example:
+
+```text
+myapp:a83f91c
+myapp:production
+```
+
+The first tells you **which build**.
+
+The second tells you **where that build is currently promoted**.
+
+---
+
+# 16. Why `latest` Is Often Misunderstood
+
+People sometimes think:
+
+```text
+latest = newest image
+```
+
+That's not quite the right mental model.
+
+`latest` is simply a **tag name**.
+
+It doesn't inherently mean:
+
+```text
+highest version
+```
+
+or:
+
+```text
+most recently created
+```
+
+It is a conventional tag that can be assigned to whichever image a publisher chooses.
+
+So:
+
+```text
+myapp:latest
+```
+
+doesn't guarantee:
+
+```text
+highest version
+```
+
+Think:
+
+```text
+latest
+  ↓
+just another tag
+```
+
+---
+
+# 17. Hands-on Exercise — Inspect Tags
+
+Run:
+
+```bash
+docker images
+```
+
+Find an image you have built.
+
+For example:
+
+```text
+REPOSITORY   TAG
+tag-demo     1.0
+```
+
+Create another tag:
+
+```bash
+docker tag tag-demo:1.0 tag-demo:test
+```
+
+Then:
+
+```bash
+docker images tag-demo
+```
+
+You should see:
+
+```text
+REPOSITORY   TAG
+tag-demo     1.0
+tag-demo     test
+```
+
+Now remove one tag:
+
+```bash
+docker rmi tag-demo:test
+```
+
+The underlying image doesn't necessarily disappear because another tag still references it.
+
+Then:
+
+```bash
+docker images tag-demo
+```
+
+You should still see:
+
+```text
+tag-demo:1.0
+```
+
+This demonstrates that tags are references to images rather than separate image contents.
+
+---
+
+# 18. Tagging and Reproducibility
+
+This is particularly important for CI/CD.
+
+Consider:
 
 ```text
 Dockerfile
     ↓
-FROM base image
+docker build
     ↓
-Base image layers
+myapp:latest
+```
+
+Six months later, you might not know exactly which image `latest` represented at the time of deployment.
+
+Compare that with:
+
+```text
+Dockerfile
     ↓
-Your Dockerfile instructions
+docker build
     ↓
-Additional layers
+myapp:1.4.2
     ↓
-Final Docker image
-    ↓
+digest: sha256:...
+```
+
+Now you have much stronger traceability.
+
+A mature CI/CD pipeline often records:
+
+```text
+Source commit
+     ↓
+CI build
+     ↓
+Image tag
+     ↓
+Image digest
+     ↓
+Deployment
+```
+
+That relationship becomes extremely valuable when troubleshooting production deployments.
+
+---
+
+# 19. What Happens During `docker pull`?
+
+Suppose:
+
+```bash
+docker pull nginx:1.27
+```
+
+Docker asks the registry for the image associated with that reference.
+
+Conceptually:
+
+```text
+nginx:1.27
+    │
+    ▼
 Registry
-    ↓
+    │
+    ▼
+Image manifest
+    │
+    ├── Layer 1
+    ├── Layer 2
+    ├── Layer 3
+    └── ...
+```
+
+Docker then downloads whatever content it doesn't already have locally.
+
+This connects directly back to Part 4:
+
+```text
+Tag
+ ↓
+Image manifest
+ ↓
+Image layers
+ ↓
+Local image
+```
+
+---
+
+# 20. A More Complete Image Mental Model
+
+We can now connect almost the entire Phase 1.
+
+Consider:
+
+```text
+registry.example.com/team/payment-service:1.2.0
+```
+
+The reference identifies an image in a registry.
+
+That image consists conceptually of:
+
+```text
+Image
+┌──────────────────────────────┐
+│ Application layer            │
+├──────────────────────────────┤
+│ Dependency layer             │
+├──────────────────────────────┤
+│ Base image layers            │
+└──────────────────────────────┘
+```
+
+The image has:
+
+```text
+Tag:
+1.2.0
+
+Digest:
+sha256:....
+
+Image ID:
+local Docker identifier
+```
+
+And when pulled and run:
+
+```text
+Image
+  │
+  │ docker run
+  ▼
 Container
+  │
+  └── Writable container layer
+```
+
+This is the complete mental model we've been building throughout Phase 1.
+
+---
+
+# 21. Common Mistakes
+
+### Mistake 1 — Thinking a tag is a version
+
+A tag **can represent a version**, but a tag itself is simply a reference.
+
+```text
+1.0.0
+```
+
+is a tag name.
+
+It doesn't automatically guarantee immutability.
+
+---
+
+### Mistake 2 — Thinking `latest` always means newest
+
+It doesn't.
+
+```text
+latest
+```
+
+is just a tag.
+
+---
+
+### Mistake 3 — Thinking `docker tag` creates a new image
+
+It doesn't normally create a separate copy of the image contents.
+
+It creates another reference to the image.
+
+---
+
+### Mistake 4 — Thinking tags are immutable
+
+Tags can be moved.
+
+For example:
+
+```text
+myapp:production
+       ↓
+Image A
+```
+
+can later become:
+
+```text
+myapp:production
+       ↓
+Image B
+```
+
+---
+
+### Mistake 5 — Confusing Image ID and Digest
+
+They serve different purposes.
+
+```text
+Image ID
     ↓
-Container filesystem
+Local Docker image store
+
+
+Digest
+    ↓
+Content-addressed image identity
 ```
 
-And that naturally brings us to the final topic of Phase 1:
+---
+
+# 22. What You Should Know Now
+
+You should now understand:
+
+* A tag is a human-readable reference to an image.
+* An image reference can include a registry, repository, and tag.
+* `latest` is simply a conventional tag.
+* Tags can be changed or moved.
+* `docker tag` creates another reference to an image.
+* One image can have multiple tags.
+* Tags are commonly used for application versions and CI build identifiers.
+* Image IDs identify local Docker images.
+* Digests provide content-based image identification.
+* Digests are useful for reproducible deployments.
+* Tags and digests serve different purposes.
+
+The essential model is:
 
 ```text
-08. Image tags
+Registry
+   │
+   ▼
+Repository
+   │
+   ├── :1.0
+   ├── :1.1
+   ├── :stable
+   └── :latest
+          │
+          ▼
+       Image
+          │
+          ├── Image layers
+          │
+          └── Digest
 ```
 
-because we've repeatedly written things like:
+---
+
+# Phase 1 — COMPLETE 🎯
+
+We've now finished the entire planned Phase 1:
 
 ```text
-ubuntu:24.04
-python:3.12
-my-app:1.0
+Phase 1 — Docker Fundamentals
+
+01. Container vs Image       ✅
+02. Dockerfile               ✅
+03. Build Context            ✅
+04. Docker Image Layers      ✅
+05. Docker Image Registry    ✅
+06. Container Filesystem     ✅
+07. Base Images              ✅
+08. Image Tags               ✅
 ```
 
-The `:24.04`, `:3.12`, and `:1.0` portions are **image tags**.
+More importantly, the concepts now connect:
+
+```text
+                    Dockerfile
+                        │
+                        │ uses
+                        ▼
+                  Build Context
+                        │
+                        ▼
+                    Base Image
+                        │
+                        ▼
+                  Build Process
+                        │
+                        ▼
+                   Image Layers
+                        │
+                        ▼
+                   Docker Image
+                   /         \
+                  /           \
+             Tag             Digest
+                \             /
+                 \           /
+                  ▼         ▼
+                    Registry
+                        │
+                        │ pull
+                        ▼
+                     Container
+                        │
+                        ▼
+              Writable Filesystem
+```
+
+### The CI/CD mental model
+
+And this is the bigger picture you should carry forward:
+
+```text
+Developer
+    │
+    │ source code
+    ▼
+Git Repository
+    │
+    ▼
+CI Pipeline
+    │
+    │ docker build
+    ▼
+Docker Image
+    │
+    ├── Layers
+    ├── Tag
+    └── Digest
+    │
+    │ docker push
+    ▼
+Container Registry
+    │
+    │ docker pull
+    ▼
+Deployment Environment
+    │
+    ▼
+Container
+```
+
+That is the foundation we needed before moving into **actual standard Docker image building**.
+
+## Next Phase
+
+```text
+Phase 1 — Docker Fundamentals       ✅ COMPLETE
+
+                    ↓
+
+Phase 2 — Build Your First Docker Image
+```
+
+In Phase 2, we stop primarily discussing individual concepts and start putting them together into **real image-building workflows**: project structure → Dockerfile → build context → `docker build` → inspecting the result → running it → iterating on the image.

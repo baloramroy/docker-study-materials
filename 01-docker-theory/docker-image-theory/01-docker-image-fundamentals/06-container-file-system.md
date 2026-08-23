@@ -1,37 +1,25 @@
 # Phase 1 — Part 6: Container Filesystem
 
-We are now moving to:
+## Where we are
 
 ```text
+Phase 1 — Docker Fundamentals
+
 01. Container vs Image       ✅
 02. Dockerfile               ✅
-03. Build context            ✅
-04. Docker image layers      ✅
-05. Docker image registry    ✅
-06. Container filesystem     ← NOW
-07. Base images
-08. Image tags
+03. Build Context            ✅
+04. Docker Image Layers      ✅
+05. Docker Image Registry    ✅
+06. Container Filesystem     ← NOW
+07. Base Images
+08. Image Tags
 ```
 
-This topic is extremely important because it connects the concepts we've already learned:
+This part connects directly to what we learned about image layers.
 
-```text
-Dockerfile
-    ↓
-Build context
-    ↓
-Image layers
-    ↓
-Image registry
-    ↓
-Image
-    ↓
-Container filesystem   ← NOW
-```
+The key question is:
 
-The key question we want to answer is:
-
-> **When Docker creates a container from an image, what filesystem does the container actually see?**
+> **When a container starts from an image, where does its filesystem come from, and what happens when the container changes files?**
 
 ---
 
@@ -94,932 +82,570 @@ That is the heart of this lesson.
 
 ---
 
-# 2. Connect this to image layers
+# 2. The Read-Only Image Layers
 
-In Step 4, we learned that an image is composed of layers.
+Remember Part 4.
+
+An image consists of layers:
+
+```text
+Image
+┌──────────────────────────┐
+│ Layer 3                  │
+├──────────────────────────┤
+│ Layer 2                  │
+├──────────────────────────┤
+│ Layer 1                  │
+└──────────────────────────┘
+```
+
+These image layers are treated as **read-only** when used by a running container.
+
+But containers need to be able to modify files.
+
+For example, an application may need to:
+
+```text
+create a log
+update a temporary file
+write application data
+modify configuration
+create a cache
+```
+
+Docker therefore adds a writable layer on top.
+
+---
+
+# 3. The Container Writable Layer
+
+When a container is created, the basic structure is:
+
+```text
+Container
+┌──────────────────────────────┐
+│ Writable Container Layer     │
+├──────────────────────────────┤
+│ Image Layer                  │
+├──────────────────────────────┤
+│ Image Layer                  │
+├──────────────────────────────┤
+│ Image Layer                  │
+└──────────────────────────────┘
+```
+
+The image layers remain read-only.
+
+The top layer belongs to the container and is writable.
+
+This is the key filesystem model:
+
+> **Image = read-only layers**
+> **Container = image layers + writable container layer**
+
+---
+
+# 4. What Does the Container Actually See?
+
+Although there are multiple layers underneath, the application normally sees them as **one unified filesystem**.
 
 For example:
 
 ```text
-Image
-│
-├── Layer 4 — application files
-├── Layer 3 — dependencies
-├── Layer 2 — runtime
-└── Layer 1 — base filesystem
-```
-
-These image layers are effectively **read-only** when the image is used by a container.
-
-When Docker creates a container, it adds a new writable layer:
-
-```text
 Container
 │
-├── Writable container layer
-│
-├── Image Layer 4
-├── Image Layer 3
-├── Image Layer 2
-└── Image Layer 1
+├── /bin
+├── /etc
+├── /usr
+├── /var
+└── /app
 ```
 
-This is the fundamental filesystem model.
+The application doesn't normally need to know:
+
+```text
+/app came from Layer 3
+/etc came from Layer 2
+/bin came from Layer 1
+```
+
+Docker's storage system presents a unified filesystem view.
+
+Conceptually:
+
+```text
+Image Layers
+     +
+Writable Layer
+     │
+     ▼
+Unified Container Filesystem
+```
 
 ---
 
-# 3. The mental model
+# 5. Reading a File
 
-Think of the image as a **read-only foundation**.
-
-Then think of the container as:
-
-```text
-Read-only image
-       +
-Writable container layer
-       =
-Container filesystem
-```
-
-Or visually:
-
-```text
-              Container filesystem
-                     │
-          ┌──────────┴──────────┐
-          │                     │
-   Writable layer         Image layers
-          │                     │
-    container changes       read-only
-```
-
-This is why two containers can be created from the same image without modifying the image itself.
-
----
-
-# 4. A concrete example
-
-Suppose we have this image:
-
-```text
-my-app:1.0
-```
-
-Its filesystem contains:
+Suppose the image contains:
 
 ```text
 /app/app.py
-/app/config.txt
 ```
 
-Now we create two containers:
+When the container starts:
 
 ```bash
-docker run --name app1 my-app:1.0
-docker run --name app2 my-app:1.0
+docker run my-app
 ```
 
-We now have:
+the container can read:
+
+```bash
+cat /app/app.py
+```
+
+If the application only reads the file, Docker doesn't need to create a new copy in the writable layer.
+
+Conceptually:
 
 ```text
-                 my-app:1.0
-                 Image layers
-                 /          \
-                /            \
-             app1            app2
-              |               |
-        writable layer   writable layer
+Read /app/app.py
+       │
+       ▼
+Image layer
 ```
 
-Both containers start with the same filesystem content.
-
-But their writable changes are independent.
+The existing image data can be reused.
 
 ---
 
-# 5. Let's prove it
+# 6. What Happens When the Container Modifies a File?
 
-Suppose we create a container:
+Now suppose:
+
+```text
+/app/config.txt
+```
+
+already exists in the image.
+
+Inside the running container:
 
 ```bash
-docker run -it --name test1 ubuntu:24.04 bash
+echo "new value" > /app/config.txt
+```
+
+The original image layer isn't modified.
+
+Instead, Docker's storage system handles the modification through the writable container layer.
+
+Conceptually:
+
+```text
+Before:
+
+Writable Layer
+     │
+     │ empty
+     ▼
+Image Layer
+└── /app/config.txt
+
+
+After modification:
+
+Writable Container Layer
+└── modified /app/config.txt
+
+Image Layer
+└── original /app/config.txt
+```
+
+The container sees the modified version.
+
+The original image remains unchanged.
+
+---
+
+# 7. This Is Why Containers Don't Modify the Image
+
+Suppose you run:
+
+```bash
+docker run -it ubuntu bash
+```
+
+and inside the container:
+
+```bash
+touch /tmp/test.txt
+```
+
+You have modified the **container**, not the Ubuntu image.
+
+If you then remove the container:
+
+```bash
+docker rm <container>
+```
+
+the modification disappears.
+
+The image is still unchanged.
+
+So:
+
+```text
+Image
+  │
+  ├── Container A
+  │      └── changes
+  │
+  └── Container B
+         └── changes
+```
+
+Container A's changes don't become part of the image.
+
+---
+
+# 8. Hands-on Exercise — Container Changes
+
+Let's see this directly.
+
+Run:
+
+```bash
+docker run -it --name filesystem-demo alpine sh
 ```
 
 Inside the container:
 
 ```bash
-touch /hello.txt
+echo "Hello Docker" > /tmp/test.txt
 ```
 
-Now:
+Check it:
 
 ```bash
-ls /
+cat /tmp/test.txt
 ```
 
-will show:
+You should get:
 
 ```text
-hello.txt
+Hello Docker
 ```
 
-We modified the container's filesystem.
-
-But we did **not modify the `ubuntu:24.04` image**.
-
-If we create another container:
+Now exit:
 
 ```bash
-docker run -it --name test2 ubuntu:24.04 bash
+exit
 ```
 
-and run:
+The container has stopped, but still exists.
+
+Check:
 
 ```bash
-ls /
+docker ps -a
 ```
 
-we won't find:
+Start it again:
+
+```bash
+docker start filesystem-demo
+```
+
+Then:
+
+```bash
+docker exec filesystem-demo cat /tmp/test.txt
+```
+
+You should still get:
 
 ```text
-hello.txt
+Hello Docker
 ```
+
+Why?
+
+Because the container still exists, including its writable layer.
+
+---
+
+# 9. Remove the Container
+
+Now remove it:
+
+```bash
+docker rm -f filesystem-demo
+```
+
+Create a completely new container:
+
+```bash
+docker run --rm alpine cat /tmp/test.txt
+```
+
+You should get an error because `/tmp/test.txt` isn't present.
 
 Why?
 
 Because:
 
 ```text
-test1
-   ↓
-its own writable layer
-   ↓
-hello.txt
+Old Container
+└── writable layer
+    └── /tmp/test.txt
 ```
 
-while:
+was deleted when the container was removed.
+
+The Alpine image itself never contained:
 
 ```text
-test2
-   ↓
-different writable layer
-   ↓
-no hello.txt
+/tmp/test.txt
 ```
-
-Both containers share the same underlying image layers, but each gets its own writable layer.
 
 ---
 
-# 6. This is why containers are isolated
+# 10. The Important Difference
 
-Suppose:
-
-```text
-ubuntu:24.04
-      |
-      +----------+
-      |          |
-      v          v
-   Container A Container B
-      |          |
- writable      writable
- layer A       layer B
-```
-
-Container A creates:
+This gives us a very important lifecycle:
 
 ```text
-/data/a.txt
+docker run
+     │
+     ▼
+Container created
+     │
+     ▼
+Writable layer created
+     │
+     ▼
+Application modifies files
+     │
+     ▼
+Changes stored in container layer
+     │
+     ▼
+Container removed
+     │
+     ▼
+Writable layer removed
 ```
 
-Container B creates:
+Therefore:
 
-```text
-/data/b.txt
-```
-
-You effectively have:
-
-```text
-Container A
-    /data/a.txt
-
-Container B
-    /data/b.txt
-```
-
-They don't automatically see each other's filesystem changes.
-
-This is part of container isolation.
+> **Data written only to the container's writable layer is tied to that container's lifecycle.**
 
 ---
 
-# 7. What does the container actually see?
+# 11. Container Stop vs Container Remove
 
-This is an important point.
+This distinction is important.
 
-Inside a container, you normally see a normal Linux filesystem:
+### Stop
+
+```bash
+docker stop my-container
+```
+
+The container stops running, but the container still exists.
+
+Its writable layer remains.
+
+```text
+Container
+└── Writable Layer
+    └── data still exists
+```
+
+If you start it again:
+
+```bash
+docker start my-container
+```
+
+the data is still there.
+
+### Remove
+
+```bash
+docker rm my-container
+```
+
+The container and its writable layer are removed.
+
+```text
+Container
+└── Writable Layer
+    └── removed
+```
+
+So:
+
+```text
+STOP
+  ↓
+Container remains
+  ↓
+Writable data remains
+
+
+REMOVE
+  ↓
+Container disappears
+  ↓
+Writable layer disappears
+```
+
+---
+
+# 12. Why This Matters for Applications
+
+Imagine a database running inside a container:
+
+```text
+MySQL Container
+└── /var/lib/mysql/
+```
+
+If the database stores everything only inside the container's writable layer:
+
+```text
+Container
+└── Writable Layer
+    └── database files
+```
+
+then removing the container can remove the database data.
+
+That is obviously undesirable.
+
+This leads to an important Docker concept:
+
+> **Persistent application data should generally not depend solely on the container's writable layer.**
+
+This is why Docker provides **volumes** and other storage mechanisms.
+
+We won't go deeply into volumes here because they're outside the current Phase 1 roadmap.
+
+For now, just understand **why persistent storage mechanisms are necessary**.
+
+---
+
+# 13. Container Filesystem Is Not the Same as Host Filesystem
+
+Another common misunderstanding:
+
+> "If I create `/app/test.txt` inside the container, I created it on the host."
+
+Not necessarily.
+
+Without a mounted storage mechanism:
+
+```text
+Host Filesystem
+       │
+       │ isolated
+       ▼
+Container Filesystem
+       │
+       └── /app/test.txt
+```
+
+The file belongs to the container's filesystem.
+
+It doesn't automatically appear somewhere like:
+
+```text
+/home/user/app/test.txt
+```
+
+on the host.
+
+This filesystem isolation is one of the fundamental properties of containers.
+
+---
+
+# 14. Containers Share the Host Kernel
+
+There is one important clarification.
+
+Container filesystem isolation does **not** mean a container has its own complete operating-system kernel.
+
+A simplified model is:
+
+```text
+Host
+┌──────────────────────────────┐
+│ Linux Kernel                 │
+│                              │
+│   ┌─────────┐  ┌─────────┐  │
+│   │Container│  │Container│  │
+│   │Filesystem│ │Filesystem│ │
+│   └─────────┘  └─────────┘  │
+└──────────────────────────────┘
+```
+
+Containers have isolated:
+
+* filesystem views
+* processes
+* networking
+* other namespaces/resources
+
+but they normally share the host's kernel.
+
+This is one of the fundamental differences between containers and traditional virtual machines.
+
+We don't need to go deeper into Linux namespaces here.
+
+---
+
+# 15. Hands-on Exercise — See the Container Filesystem
+
+Run:
+
+```bash
+docker run -it --name fs-demo alpine sh
+```
+
+Inside:
 
 ```bash
 ls /
 ```
 
-You might see:
+You'll see directories such as:
 
 ```text
 bin
 dev
 etc
 home
-lib
-lib64
-media
-mnt
-opt
 proc
 root
-run
-sbin
 sys
 tmp
 usr
 var
 ```
 
-It looks like a normal Linux filesystem.
-
-That's because, from the application's perspective, it **is interacting with a filesystem namespace that looks like its own root filesystem**.
-
-For example:
-
-```bash
-cd /app
-ls
-```
-
-might show:
-
-```text
-app.py
-requirements.txt
-```
-
-The application doesn't need to know:
-
-> "I'm actually using image layers plus a writable container layer."
-
-Docker/container runtime handles that underneath.
-
----
-
-# 8. The root filesystem
-
-Inside a container, `/` is the root of that container's filesystem view.
-
-For example:
-
-```text
-/
-├── etc
-├── usr
-├── var
-├── tmp
-└── app
-```
-
-This is called the container's **root filesystem** or **rootfs** in many technical contexts.
-
-An important beginner misconception is:
-
-> `/` inside the container is not simply the same `/` as the host.
-
-For example:
-
-```text
-HOST
-/
-├── home
-├── etc
-├── var
-└── ...
-
-CONTAINER
-/
-├── etc
-├── usr
-├── var
-└── app
-```
-
-The container has its own filesystem view.
-
----
-
-# 9. Container filesystem vs host filesystem
-
-Imagine your Linux host has:
-
-```text
-/home/user/project
-```
-
-Inside the container, you might have:
-
-```text
-/app
-```
-
-These are not automatically the same directory.
-
-Without a mount:
-
-```text
-Host
-/home/user/project
-       |
-       X
-       |
-Container
-/app
-```
-
-They are separate.
-
-If you explicitly mount the host directory:
-
-```bash
-docker run \
-  -v /home/user/project:/app \
-  my-app:1.0
-```
-
-then:
-
-```text
-Host
-/home/user/project
-        |
-        | mount
-        v
-Container
-/app
-```
-
-Now `/app` inside the container corresponds to the host directory.
-
-This is a major concept that we'll eventually connect to **volumes and bind mounts**.
-
-For now, remember:
-
-> **A container filesystem is isolated from the host filesystem unless something is explicitly mounted/shared.**
-
----
-
-# 10. What happens when a container writes a file?
-
-This is where the writable layer becomes important.
-
-Suppose the image contains:
-
-```text
-/app/config.txt
-```
-
-The image layer contains:
-
-```text
-config.txt
-```
-
-Now the application runs:
-
-```text
-echo "new configuration" > /app/config.txt
-```
-
-What happens?
-
-Docker doesn't go back and modify the original image layer.
-
-Instead, the change is handled through the container's writable layer.
-
-Conceptually:
-
-```text
-Image layer
-/app/config.txt
-       │
-       │ original
-       ▼
-Container writable layer
-/app/config.txt
-       │
-       │ modified version
-       ▼
-Container sees:
-"new configuration"
-```
-
-The original image remains unchanged.
-
----
-
-# 11. Copy-on-write
-
-This behavior is commonly described using the concept **copy-on-write (CoW)**.
-
-The basic idea:
-
-> **Containers can share the underlying read-only image data, while changes are stored separately in the container's writable layer.**
-
-Imagine two containers:
-
-```text
-             Image
-              │
-       ┌──────┴──────┐
-       │             │
-       v             v
- Container A     Container B
- writable A      writable B
-```
-
-Both can use the same image data.
-
-If Container A changes something:
-
-```text
-Container A
-     |
-     +-- changed data
-```
-
-Container B isn't automatically affected.
-
-This is one of the reasons containers can be lightweight compared with making a complete copy of an entire operating-system filesystem for every container.
-
----
-
-# 12. What happens when the container is deleted?
-
-This is extremely important.
-
-Suppose:
-
-```bash
-docker run --name test1 ubuntu:24.04
-```
-
-Inside it:
-
-```bash
-touch /important.txt
-```
-
 Now:
 
-```text
-Container writable layer
-        |
-        +-- important.txt
-```
-
-If you remove the container:
-
 ```bash
-docker rm test1
-```
-
-the container's writable layer is removed along with the container.
-
-Therefore:
-
-```text
-important.txt
-```
-
-is gone.
-
-The image is still there:
-
-```text
-ubuntu:24.04
-```
-
-but your container-specific filesystem change is gone.
-
----
-
-# 13. This leads to a very important rule
-
-> **The writable layer of a container is temporary storage.**
-
-If your application writes important data directly into the container filesystem:
-
-```text
-Container
-   |
-   +-- database files
-   +-- uploaded files
-   +-- logs
-```
-
-and the container is deleted:
-
-```text
-Container
-   ↓
-deleted
-   ↓
-writable layer deleted
-```
-
-your data may disappear.
-
-This is why Docker provides **persistent storage mechanisms** such as:
-
-* volumes
-* bind mounts
-* other storage mechanisms
-
-We'll study those later.
-
-For now:
-
-```text
-Container filesystem
-        ≠
-Persistent application storage
-```
-
----
-
-# 14. A very common beginner misconception
-
-A beginner might think:
-
-> "If I install something inside a running container, it becomes part of the Docker image."
-
-No.
-
-Suppose:
-
-```bash
-docker run -it ubuntu:24.04 bash
-```
-
-Then:
-
-```bash
-apt update
-apt install nginx
-```
-
-Now nginx exists inside that running container.
-
-But you have **not changed `ubuntu:24.04`**.
-
-The image remains the same.
-
-You changed the container's writable layer.
-
-Conceptually:
-
-```text
-ubuntu:24.04
-     |
-     +-- read-only image
-             |
-             +-- container writable layer
-                    |
-                    +-- nginx
-```
-
-If you delete the container:
-
-```bash
-docker rm <container>
-```
-
-the installed nginx disappears with it.
-
----
-
-# 15. Then how does software become part of an image?
-
-Through the image build process.
-
-For example:
-
-```dockerfile
-FROM ubuntu:24.04
-
-RUN apt-get update && \
-    apt-get install -y nginx
-```
-
-Then:
-
-```bash
-docker build -t my-nginx:1.0 .
-```
-
-Now the installation becomes part of an **image layer**.
-
-Conceptually:
-
-```text
-Dockerfile
-   |
-   v
-RUN apt install nginx
-   |
-   v
-Image layer
-   |
-   v
-my-nginx:1.0
-```
-
-Then every new container created from that image starts with nginx already present.
-
-This connects our topics together:
-
-```text
-Dockerfile
-    ↓
-Build
-    ↓
-Image layer
-    ↓
-Image
-    ↓
-Container
-    ↓
-Writable layer
-```
-
----
-
-# 16. Image filesystem vs container filesystem
-
-This distinction is worth memorizing.
-
-### Image
-
-```text
-Image
-├── Layer 1  read-only
-├── Layer 2  read-only
-├── Layer 3  read-only
-└── Layer 4  read-only
-```
-
-### Container
-
-```text
-Container
-├── Writable layer
-├── Image Layer 4
-├── Image Layer 3
-├── Image Layer 2
-└── Image Layer 1
-```
-
-So:
-
-> **An image is a reusable read-only template. A container gets a writable layer on top of that image.**
-
----
-
-# 17. Multiple containers from one image
-
-This is one of Docker's most important design characteristics.
-
-Suppose:
-
-```text
-my-app:1.0
-```
-
-is your image.
-
-You create:
-
-```bash
-docker run --name app1 my-app:1.0
-docker run --name app2 my-app:1.0
-docker run --name app3 my-app:1.0
-```
-
-Conceptually:
-
-```text
-                 my-app:1.0
-                 Image layers
-                /     |     \
-               /      |      \
-              v       v       v
-            app1     app2     app3
-             |        |        |
-           RW-1     RW-2     RW-3
-```
-
-The containers can share the image's underlying read-only data while having independent writable layers.
-
-This is a major reason Docker can efficiently create many containers from the same image.
-
----
-
-# 18. What about logs?
-
-Suppose your application writes:
-
-```text
-/app/logs/application.log
-```
-
-If `/app/logs` is just part of the container filesystem:
-
-```text
-Container
-   |
-   +-- /app/logs/application.log
-```
-
-then the log is stored in the container's writable storage.
-
-If the container is removed, that data can disappear.
-
-In production, we generally don't want important application data to depend on the lifetime of a container.
-
-That's why production architectures usually externalize important state:
-
-```text
-Container
-   |
-   +-- application
-   |
-   +-- logs → logging system
-   |
-   +-- database → persistent storage
-```
-
-We'll eventually connect this to:
-
-* Docker volumes
-* log drivers
-* centralized logging
-* Kubernetes persistent volumes
-
-But those are later topics.
-
----
-
-# 19. What about `/proc`, `/sys`, and `/dev`?
-
-You may notice something interesting when exploring a container:
-
-```bash
-ls /
-```
-
-and see:
-
-```text
-proc
-sys
-dev
-```
-
-These aren't simply ordinary application directories containing regular files.
-
-Linux uses special virtual/pseudo filesystems for things such as:
-
-```text
-/proc
-/sys
-/dev
-```
-
-Containers use Linux kernel mechanisms such as namespaces to provide an isolated view of many of these resources.
-
-You don't need to understand the kernel implementation yet.
-
-At the beginner level, remember:
-
-> **A container gets its own filesystem view, but it still uses the host's Linux kernel.**
-
-This is an important distinction.
-
----
-
-# 20. Container filesystem does NOT mean a complete VM
-
-This is another important misconception.
-
-A virtual machine might look like:
-
-```text
-VM
-├── Guest OS
-├── Guest kernel
-├── Guest filesystem
-└── Application
-```
-
-A container is different:
-
-```text
-Container
-├── Container filesystem
-├── Application
-└── Uses host kernel
-```
-
-So a container has its own filesystem environment, but it does **not** normally contain its own separate Linux kernel.
-
-This is one reason containers are generally much lighter than VMs.
-
----
-
-# 21. What Docker is actually doing
-
-Let's simplify the whole process.
-
-When you run:
-
-```bash
-docker run my-app:1.0
-```
-
-conceptually Docker/container runtime does something like:
-
-```text
-1. Find the image
-       ↓
-2. Prepare image layers
-       ↓
-3. Add a writable container layer
-       ↓
-4. Create the container's isolated environment
-       ↓
-5. Start the configured process
-```
-
-The application then sees something like:
-
-```text
-/
-├── etc
-├── usr
-├── var
-├── tmp
-└── app
-```
-
-while underneath:
-
-```text
-Container filesystem
-        |
-        +-- writable container layer
-        |
-        +-- read-only image layers
-```
-
-That is the mental model we want.
-
----
-
-# 22. Hands-on experiment
-
-This is a very good experiment to perform on your Docker lab.
-
-Start a container:
-
-```bash
-docker run -it --name filesystem-test ubuntu:24.04 bash
-```
-
-Inside:
-
-```bash
-echo "hello from container" > /hello.txt
+mkdir /mydata
+echo "container data" > /mydata/data.txt
 ```
 
 Check:
 
 ```bash
-cat /hello.txt
-```
-
-You should get:
-
-```text
-hello from container
+cat /mydata/data.txt
 ```
 
 Exit:
@@ -1028,298 +654,218 @@ Exit:
 exit
 ```
 
-Now start the same container again:
+Now start the same container:
 
 ```bash
-docker start -ai filesystem-test
+docker start fs-demo
 ```
 
 Check:
 
 ```bash
-cat /hello.txt
+docker exec fs-demo cat /mydata/data.txt
 ```
 
-It should still exist.
+The data remains because the container still exists.
 
-Why?
-
-Because you stopped the container, but did **not delete it**.
-
-Its writable layer still exists.
-
-Now exit:
+Now:
 
 ```bash
-exit
+docker rm -f fs-demo
 ```
 
-Remove the container:
+Create a new container:
 
 ```bash
-docker rm filesystem-test
+docker run --rm alpine ls /mydata
 ```
 
-Create a new container from the same image:
+It should report that `/mydata` doesn't exist.
 
-```bash
-docker run -it --name filesystem-test2 ubuntu:24.04 bash
-```
-
-Check:
-
-```bash
-ls /hello.txt
-```
-
-It should not exist.
-
-Why?
-
-```text
-Container 1
-    |
-    +-- writable layer
-          |
-          +-- /hello.txt
-```
-
-Container 1 was deleted.
-
-The image:
-
-```text
-ubuntu:24.04
-```
-
-was never changed.
-
-The new container gets a new writable layer.
+That demonstrates the lifecycle of the writable container layer.
 
 ---
 
-# 23. The lifecycle picture
+# 16. How This Connects to Image Layers
 
-This experiment gives us a very important model:
+We can now combine Part 4 and Part 6.
+
+An image:
 
 ```text
-                 Image
-                  │
-             docker run
-                  │
-                  v
-            +-----------+
-            | Container |
-            |           |
-            | RW Layer  |
-            +-----------+
-                  │
-             docker stop
-                  │
-                  v
-            Container exists
-            RW layer remains
-                  │
-             docker start
-                  │
-                  v
-            Same filesystem
-                  │
-              docker rm
-                  │
-                  v
-            RW layer removed
+┌──────────────────────┐
+│ Image Layer 3        │
+├──────────────────────┤
+│ Image Layer 2        │
+├──────────────────────┤
+│ Image Layer 1        │
+└──────────────────────┘
 ```
 
-So:
+A running container:
 
 ```text
-STOP ≠ DELETE
+┌──────────────────────────────┐
+│ Writable Container Layer     │
+├──────────────────────────────┤
+│ Image Layer 3                │
+├──────────────────────────────┤
+│ Image Layer 2                │
+├──────────────────────────────┤
+│ Image Layer 1                │
+└──────────────────────────────┘
 ```
 
-Stopping a container does not normally destroy its writable filesystem.
-
-Deleting the container does.
-
----
-
-# 24. The connection to CI/CD
-
-Now let's connect this to CI/CD.
-
-Suppose Jenkins deploys:
+So the relationship is:
 
 ```text
-my-app:42
-```
-
-Kubernetes creates a container from that image.
-
-The container gets:
-
-```text
-Image
-  +
-Writable layer
-  =
-Container filesystem
-```
-
-Now imagine your application writes important data directly into:
-
-```text
-/app/data
-```
-
-and the deployment replaces the container.
-
-The old container disappears.
-
-Its writable layer disappears.
-
-Therefore, application state stored there may disappear.
-
-This is one reason modern CI/CD systems favor **stateless application containers**.
-
-A common architecture is:
-
-```text
+Docker Image
+     │
+     │ docker run
+     ▼
 Container
-   |
-   +-- application code
-   |
-   +-- temporary files
-   |
-   +-- ephemeral data
+     │
+     ├── Image layers (read-only)
+     │
+     └── Writable container layer
 ```
 
-while persistent state lives elsewhere:
-
-```text
-Database
-Object Storage
-Persistent Volume
-External Logging System
-```
-
-This becomes extremely important when we reach Kubernetes.
+This is one of the most important Docker filesystem mental models.
 
 ---
 
-# 25. Beginner concepts vs advanced concepts
+# 17. Common Mistakes
 
-### You should understand now
+### Mistake 1 — Thinking a container modifies the image
 
-Make sure these are clear:
+Incorrect:
 
-1. A container gets a filesystem based on its image.
-2. Image layers are read-only.
-3. A running container gets a writable layer.
-4. Changes made inside the container go into its writable layer.
-5. Different containers have different writable layers.
-6. Deleting the container removes its writable layer.
-7. The image itself isn't modified when a container changes files.
-8. A container's filesystem is not automatically the host filesystem.
-9. Important persistent data should not depend on the container writable layer.
-10. Containers use the host's Linux kernel rather than having their own separate kernel.
+```text
+Container changes
+      ↓
+Image changes
+```
 
-### Advanced — leave for later
+Correct:
 
-We don't need to dive into these yet:
+```text
+Container changes
+      ↓
+Container writable layer
+```
 
-* overlay2
-* OverlayFS
-* lowerdir
-* upperdir
-* merged directory
-* copy-up behavior
-* whiteout files
-* inode behavior
-* storage drivers
-* containerd snapshotters
-* filesystem performance characteristics
-* rootless storage
-* SELinux labeling
-
-Those are useful later, especially for production troubleshooting, but they would distract from the fundamental mental model right now.
+The original image remains unchanged.
 
 ---
 
-# 26. The complete Phase 1 mental model so far
+### Mistake 2 — Thinking stopped containers lose their data
 
-We can now connect **all six topics**:
+Incorrect:
 
 ```text
-                 Dockerfile
-                     |
-                     v
-               Build Context
-                     |
-                     v
-                Docker Build
-                     |
-                     v
-                Image Layers
-                     |
-                     v
-                 Docker Image
-                     |
-                     | push
-                     v
-              Image Registry
-                     |
-                     | pull
-                     v
-                 Docker Image
-                     |
-                  docker run
-                     |
-                     v
-          +----------------------+
-          | Container Filesystem |
-          |                      |
-          | Writable Layer       |
-          |        +             |
-          | Image Read-Only      |
-          | Layers               |
-          +----------------------+
-                     |
-                     v
-                Application
+docker stop
+    ↓
+data deleted
 ```
 
-This is the important progression:
+Correct:
 
-> **Dockerfile tells Docker how to build → build context supplies the input → Docker creates image layers → those layers form an image → registry distributes the image → container gets a filesystem from that image plus a writable layer.**
+```text
+docker stop
+    ↓
+container still exists
+    ↓
+writable data remains
+```
+
+Data is normally lost when the container itself is removed, assuming it wasn't stored in persistent storage.
 
 ---
 
-# 27. The one sentence to remember
+### Mistake 3 — Treating the writable layer as persistent storage
 
-If you remember only one thing from Step 6:
+The writable layer exists for the container's lifecycle.
 
-> **A container gets a filesystem from the image's read-only layers plus its own writable layer, and that writable layer belongs to the lifetime of the container.**
+For important application data, use appropriate persistent storage such as Docker volumes or external storage.
 
-And the most important diagram is:
+---
+
+# 18. What You Should Know Now
+
+You should now understand:
+
+* A container gets its initial filesystem from the image.
+* Image layers are read-only.
+* A container gets a writable layer on top of those image layers.
+* The container sees all of this as one unified filesystem.
+* Modifications happen in the container's writable layer rather than changing the image.
+* Stopping a container does not remove its writable layer.
+* Removing the container normally removes that writable layer.
+* Container filesystem data is therefore not automatically persistent.
+* Persistent application data requires an appropriate storage mechanism.
+* Container filesystem isolation is separate from the host filesystem.
+
+The key model is:
 
 ```text
-             CONTAINER FILESYSTEM
-
-        ┌─────────────────────────┐
-        │   Writable Layer        │  ← container changes
-        ├─────────────────────────┤
-        │   Image Layer 4         │  ← read-only
-        ├─────────────────────────┤
-        │   Image Layer 3         │  ← read-only
-        ├─────────────────────────┤
-        │   Image Layer 2         │  ← read-only
-        ├─────────────────────────┤
-        │   Image Layer 1         │  ← read-only
-        └─────────────────────────┘
+              Docker Image
+        ┌──────────────────────┐
+        │ Image Layer 3        │
+        │ Image Layer 2        │
+        │ Image Layer 1        │
+        └──────────────────────┘
+                  │
+                  │ docker run
+                  ▼
+        ┌──────────────────────┐
+        │ Writable Layer       │
+        ├──────────────────────┤
+        │ Image Layer 3        │
+        │ Image Layer 2        │
+        │ Image Layer 1        │
+        └──────────────────────┘
+                  │
+                  ▼
+          Container Filesystem
 ```
 
-The next topic, **Step 7 — Base Images**, will answer an important question that naturally follows from this:
+---
 
-> **Where do those initial image filesystem layers actually come from?**
+# Phase 1 Progress
 
-That will take us into `FROM ubuntu`, `FROM alpine`, `FROM python`, and what a **base image** really means.
+```text
+Phase 1 — Docker Fundamentals
+
+01. Container vs Image       ✅
+02. Dockerfile               ✅
+03. Build Context            ✅
+04. Docker Image Layers      ✅
+05. Docker Image Registry    ✅
+06. Container Filesystem     ✅
+07. Base Images              ← NEXT
+08. Image Tags
+```
+
+We've now completed the filesystem relationship:
+
+```text
+Dockerfile
+    ↓
+Build Context
+    ↓
+Image Layers
+    ↓
+Docker Image
+    ↓
+docker run
+    ↓
+Container
+    ↓
+Writable Container Layer
+```
+
+**Next: Part 7 — Base Images.**
+
+There we'll answer an important question that has already appeared several times:
+
+> **When we write `FROM alpine`, `FROM ubuntu`, or `FROM python:3.12`, what exactly are we starting our image from, and how does that base image become part of our final image?**

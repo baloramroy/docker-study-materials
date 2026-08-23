@@ -1,1189 +1,940 @@
 # Phase 1 — Part 5: Docker Image Registry
 
-We are now moving to:
+## Where we are
 
 ```text
+Phase 1 — Docker Fundamentals
+
 01. Container vs Image       ✅
 02. Dockerfile               ✅
-03. Build context             ✅
-04. Docker image layers       ✅
-05. Docker image registry     ← NOW
-06. Container filesystem
-07. Base images
-08. Image tags
+03. Build Context            ✅
+04. Docker Image Layers      ✅
+05. Docker Image Registry    ← NOW
+06. Container Filesystem
+07. Base Images
+08. Image Tags
 ```
 
-The goal of this lesson is **not** to learn Docker Hub commands first. The goal is to understand **what an image registry actually is, why it exists, and how Docker uses it**.
+This topic is particularly important for CI/CD because building an image is only one part of the process.
+
+A typical workflow is:
+
+```text
+Source Code
+    ↓
+Docker Build
+    ↓
+Docker Image
+    ↓
+Push to Registry
+    ↓
+Registry
+    ↓
+Pull Image
+    ↓
+Deployment
+    ↓
+Container
+```
 
 ---
 
-# 1. Start with the basic concept
+# 1. What Is a Docker Image Registry?
 
-So far, we've established:
+A **Docker image registry is a service that stores and distributes container images.**
 
-* A **Dockerfile** describes how to build an image.
-* The **build context** provides files to the build.
-* Docker builds the image from **layers**.
-* The resulting image exists on the machine where you built it.
+You can think of it as a central location where Docker images are:
 
-Now imagine this:
+* pushed
+* stored
+* pulled
+* shared
+
+For example:
 
 ```text
-Your laptop
-    |
-    | docker build
-    v
-Docker Image
+Developer / CI Server
+        │
+        │ docker push
+        ▼
+   Image Registry
+        │
+        │ docker pull
+        ▼
+Server / Kubernetes
 ```
 
-You successfully built:
+The registry solves an important problem:
+
+> **How does the machine that builds an image make that image available to the machine that will run it?**
+
+---
+
+# 2. Why Do We Need a Registry?
+
+Suppose your CI server builds:
 
 ```text
 my-app:1.0
 ```
 
-That image is currently available **on your laptop**.
-
-But your production server is somewhere else.
+The image exists on the CI server:
 
 ```text
-Developer Laptop                 Production Server
-
-my-app:1.0                       ????
-    |
-    |
-    X  ← image is not here
+CI Server
+└── my-app:1.0
 ```
 
-How does the production server get the image?
+But your production server doesn't automatically have it:
 
-This is where an **image registry** comes in.
+```text
+Production Server
+└── ??? 
+```
+
+The CI server could send the image directly somehow, but that's not the standard approach.
+
+Instead:
+
+```text
+                    docker build
+                         │
+                         ▼
+                    CI Server
+                    my-app:1.0
+                         │
+                    docker push
+                         │
+                         ▼
+                  Image Registry
+                         │
+                    docker pull
+                         │
+                         ▼
+                 Production Server
+                    my-app:1.0
+```
+
+The registry acts as the **central distribution point**.
 
 ---
 
-# 2. What is a Docker image registry?
+# 3. Registry vs Repository vs Image
 
-A **Docker image registry is a server/service that stores and distributes container images.**
+These three terms are often confused.
 
-Think of it as a central storage system for Docker images.
-
-Conceptually:
+Suppose you have:
 
 ```text
-                 Docker Image Registry
-                         |
-              +----------+----------+
-              |          |          |
-           image A    image B    image C
-              |
-          layers...
-```
-
-Examples include:
-
-* Docker Hub
-* Harbor
-* Amazon Elastic Container Registry (ECR)
-* GitHub Container Registry (GHCR)
-* Google Artifact Registry
-* Azure Container Registry (ACR)
-
-The important concept is:
-
-> **A registry is where container images can be stored so that other machines can pull them.**
-
----
-
-# 3. The mental model
-
-Think about Git.
-
-You have a local Git repository:
-
-```text
-Developer Machine
-      |
-      v
-   Git Repo
-```
-
-You can push it to GitHub:
-
-```text
-Developer Machine
-      |
-      | git push
-      v
-    GitHub
-      |
-      | git clone / pull
-      v
-Other Machine
-```
-
-Docker has a very similar concept.
-
-```text
-Developer Machine
-      |
-      | docker build
-      v
-Docker Image
-      |
-      | docker push
-      v
-Image Registry
-      |
-      | docker pull
-      v
-Server
-```
-
-This is one of the most important mental models in Docker.
-
----
-
-# 4. Build vs Store vs Run
-
-Don't mix these three activities.
-
-### Build
-
-Docker creates an image:
-
-```bash
-docker build -t my-app:1.0 .
+docker.io/mycompany/my-app:1.0
 ```
 
 Conceptually:
 
 ```text
-Dockerfile
-    +
-Build Context
-    |
-    v
-Docker Build
-    |
-    v
-Image
-```
+docker.io
+    │
+    └── Registry
 
----
+mycompany/my-app
+    │
+    └── Repository
 
-### Store
-
-The image can be uploaded to a registry:
-
-```bash
-docker push my-app:1.0
-```
-
-Conceptually:
-
-```text
-Local Image
-    |
-    | push
-    v
-Registry
-```
-
----
-
-### Run
-
-Another machine can obtain the image:
-
-```bash
-docker pull my-app:1.0
-```
-
-and then run it:
-
-```bash
-docker run my-app:1.0
-```
-
-Conceptually:
-
-```text
-Registry
-    |
-    | pull
-    v
-Local Image
-    |
-    | run
-    v
-Container
+1.0
+    │
+    └── Tag
 ```
 
 So:
 
-```text
-BUILD
-  ↓
-IMAGE
-  ↓
-PUSH
-  ↓
-REGISTRY
-  ↓
-PULL
-  ↓
-IMAGE
-  ↓
-RUN
-  ↓
-CONTAINER
-```
+### Registry
 
-Keep this sequence in your head.
+Where images are stored and distributed.
+
+### Repository
+
+A named collection/location for related images.
+
+### Image
+
+A particular image artifact stored in the repository.
+
+### Tag
+
+A human-readable reference associated with an image.
+
+We'll study tags properly in **Part 8**.
 
 ---
 
-# 5. Why can't we just copy the image?
+# 4. Docker Hub
 
-A beginner might think:
-
-> "If I build the image on my laptop, why don't I just copy it to the server?"
-
-You actually **can**.
+One of the most commonly used public registries is Docker's Docker Hub.
 
 For example:
 
-```bash
-docker save my-app:1.0 -o my-app.tar
-```
-
-Then transfer the file:
-
 ```text
-Laptop
-   |
-   | my-app.tar
-   v
-Server
+docker.io/library/nginx
 ```
 
-Then load it:
+is the repository for the official Nginx image.
+
+When you previously ran:
 
 ```bash
-docker load -i my-app.tar
+docker pull nginx
 ```
 
-This works.
-
-But it becomes inconvenient when you have:
-
-```text
-10 servers
-50 servers
-100 servers
-Kubernetes cluster
-multiple environments
-multiple applications
-```
-
-A registry solves this distribution problem.
-
-Instead of manually transferring image files:
-
-```text
-Laptop
-  |
-  +----> Server 1
-  +----> Server 2
-  +----> Server 3
-  +----> Server 4
-  +----> Server 5
-```
-
-you have:
-
-```text
-              Registry
-             /    |    \
-            /     |     \
-           v      v      v
-       Server1 Server2 Server3
-```
-
----
-
-# 6. What actually gets stored?
-
-This is where our previous lesson about **image layers** becomes important.
-
-Suppose we have:
-
-```text
-my-app:1.0
-```
-
-The image consists of layers:
-
-```text
-Layer 4: Application files
-Layer 3: Dependencies
-Layer 2: Runtime
-Layer 1: Base filesystem
-```
-
-When you push the image:
-
-```bash
-docker push my-app:1.0
-```
-
-Docker does **not simply upload one giant mysterious image file**.
-
-The registry stores the image's content, including its layers and metadata.
+Docker was effectively retrieving an image from a registry.
 
 Conceptually:
 
 ```text
-                 Registry
-                    |
-          +---------+---------+
-          |         |         |
-       Layer 1   Layer 2   Layer 3
-          |         |         |
-          +---------+---------+
-                    |
-                Layer 4
-```
-
-This connects directly to our previous lesson.
-
-### Important connection
-
-**Docker image layers are one reason registries can distribute images efficiently.**
-
-If a layer already exists in the registry, Docker doesn't need to upload another identical copy.
-
----
-
-# 7. A concrete example
-
-Suppose you build:
-
-```dockerfile
-FROM python:3.12
-
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY app.py .
-```
-
-You build:
-
-```bash
-docker build -t my-app:1.0 .
-```
-
-Now your local Docker engine has:
-
-```text
-my-app:1.0
-```
-
-You want to store it in Docker Hub.
-
-You would normally give it a registry-qualified name such as:
-
-```text
-username/my-app:1.0
-```
-
-Then:
-
-```bash
-docker tag my-app:1.0 username/my-app:1.0
-```
-
-and:
-
-```bash
-docker push username/my-app:1.0
-```
-
-Now the registry contains the image.
-
-Another machine can do:
-
-```bash
-docker pull username/my-app:1.0
-```
-
-Then:
-
-```bash
-docker run username/my-app:1.0
-```
-
-The flow is:
-
-```text
-Developer Machine
-
-Dockerfile
-    |
-    v
-docker build
-    |
-    v
-my-app:1.0
-    |
-    | docker push
-    v
-+----------------------+
-|    Image Registry    |
-|                      |
-| username/my-app:1.0 |
-+----------------------+
-          |
-          | docker pull
-          v
-Production Server
-          |
-          v
-       Container
-```
-
----
-
-# 8. What is Docker Hub?
-
-Docker provides **Docker Hub**, a public registry service.
-
-![Image](https://images.openai.com/static-rsc-4/Lmk9577TeXT9dkZdGmOxxEVj6sHsc9EJo5P8Thj4pp2dbvPlfPNUImXkZ213mx6_R_NNL2wn8C5Id-n7xLupfVhRpzaMLoNfyza3o_tYiS1klOjMIBxPeHSl9mS2EShva69H5l6LIGsQdPhhLP6l2GX6GTsMFn-h-bde9zZTnv4rarYxHBFtO-ddVeCn6RUi?purpose=fullsize)
-
-![Image](https://images.openai.com/static-rsc-4/fBe66pqEJ2_dkPZRFyS_kXpwf6CeeUhqphdG4XpDrRYPJK4YOj6aymAjy2-K-NB6BusXJ62tRgATcy1FNG_ziir1qQMUaH9BFpch-X3NfiQlhBqedeFayUq3sIBIS5UL90HB3I7zOKbVioReuS7xx0bg7poSV-G5iVtzKiF6NZTaQE-1Hno2C6bPZgRMsffQ?purpose=fullsize)
-
-![Image](https://images.openai.com/static-rsc-4/yoEoeNftZPsVNw6uZE8DXkK2ck8oP70LR13FYwdzsvGuK5Bwpd0S0Ez7gu6uHJWiOyC6DblbJn9Vqh4hrA3-wINhhoMLosUwfVEm5S8ErkCz0pPun7vcsy8qB-dsDGTfWiYLWFXldEQqtVVXHXUy2IE5T5XhDTLdB99JPFL1fTNdMPXQ22rvlTcyVWQDcEGR?purpose=fullsize)
-
-![Image](https://images.openai.com/static-rsc-4/6HH0hH4E-PtRsMWoy39S9a772N1cZN-yDjF6nyYDXv0LclI59MHc9i9SkJWrFSEdTWolLcM7Etk4uvibFL7gq7ryXTGwEZszkAqE1TC5Ei7kWv3Mn0hK2qia5RWyB7ePPa4lusMdgdkCf0eCFEi6ZGuc9-kG95v0IgIME7AfTF-nFUi209qUr4m_cjG4SkAP?purpose=fullsize)
-
-![Image](https://images.openai.com/static-rsc-4/jgN5Cchz7IoUWpPJyMGVQ28YlvKe1-5giIoe12M2K80xyAHPUCQo6O8F1Wqlyj6m71JOD7xa7ixGZXk2YYfElEVOoaGxWRfIm1DF1QLDxBmS2r3iIdMKL23f40v_tGJ__grXUdtbl-8_2eqvivxTE7rWLm3rtRf1RiLzrTdaDxc_68mvmK-oWxYGkZ9gpXeH?purpose=fullsize)
-
-Docker Hub is simply one example of a registry.
-
-Don't make this conceptual mistake:
-
-> Docker ≠ Docker Hub
-
-They are different things.
-
-### Docker
-
-Docker is the container platform/tooling.
-
-For example:
-
-```bash
-docker build
-docker run
-docker pull
-docker push
-```
-
-### Docker Hub
-
-Docker Hub is a registry service where images can be stored and retrieved.
-
-```text
-Docker CLI
-    |
-    | push / pull
-    v
+docker pull nginx
+       │
+       ▼
 Docker Hub
+       │
+       ▼
+nginx image
+       │
+       ▼
+Local Docker host
 ```
 
-You can use Docker **without Docker Hub**.
-
-You can also use Docker with another registry.
+You don't always have to write `docker.io` explicitly because Docker uses its default registry when appropriate.
 
 ---
 
-# 9. Public vs private registries
+# 5. Public vs Private Registries
 
-Registries can contain **public** or **private** images.
-
-### Public image
-
-Anyone with access to the registry can pull it.
-
-Example concept:
+Registries can be broadly divided into:
 
 ```text
-Registry
-   |
-   +-- nginx
-   +-- redis
-   +-- python
-```
+Public Registry
+       │
+       └── publicly available images
 
-### Private image
-
-Authentication/authorization is required.
-
-For example, your company may have:
-
-```text
 Private Registry
-
-company/
-    payment-service
-    user-service
-    order-service
-    frontend
+       │
+       └── organization-controlled images
 ```
 
-Only authorized users or servers can pull them.
+### Public registry
 
-This is extremely common in production.
+Examples include:
+
+* Docker Hub
+* GitHub Container Registry
+* public cloud registries
+
+### Private registry
+
+Organizations commonly use private registries to store their internal application images.
+
+Examples include:
+
+* Harbor
+* Amazon ECR
+* Azure Container Registry
+* Google Artifact Registry
+* private Docker Registry
+
+For an enterprise CI/CD environment, a private registry is extremely common.
 
 ---
 
-# 10. Why companies use private registries
+# 6. Why Would a Company Use a Private Registry?
 
 Imagine your company builds:
 
 ```text
 payment-service
+customer-service
+notification-service
 ```
 
-You obviously don't want to publish its image publicly.
+You don't want those internal images publicly accessible.
 
 Instead:
 
 ```text
+                    CI Pipeline
+                        │
+                   docker build
+                        │
+                        ▼
+                  Private Registry
+                  ┌───────────────┐
+                  │ payment       │
+                  │ customer      │
+                  │ notification  │
+                  └───────────────┘
+                        │
+                        ▼
+                 Production
+```
+
+The registry can also provide:
+
+* authentication
+* access control
+* image retention
+* vulnerability scanning
+* audit information
+* repository management
+
+The exact features depend on the registry.
+
+---
+
+# 7. Image Registry in CI/CD
+
+This is the part most relevant to your goal.
+
+A typical pipeline looks like:
+
+```text
 Developer
-    |
-    | build
-    v
-payment-service:1.4
-    |
-    | push
-    v
-Private Registry
-    |
-    | pull
-    v
-Production Kubernetes
+    │
+    │ git push
+    ▼
+Git Repository
+    │
+    ▼
+CI Server
+    │
+    │ docker build
+    ▼
+Docker Image
+    │
+    │ docker push
+    ▼
+Image Registry
+    │
+    │ docker pull
+    ▼
+Deployment Environment
 ```
 
-The registry becomes an important part of your software delivery infrastructure.
+For example:
+
+```text
+Jenkins
+   │
+   │ Build
+   ▼
+my-app:build-105
+   │
+   │ Push
+   ▼
+Harbor / ECR / Docker Hub
+   │
+   │ Pull
+   ▼
+Kubernetes
+```
+
+This is the basic **build → store → deploy** model you'll encounter repeatedly in CI/CD.
 
 ---
 
-# 11. Registry vs Repository vs Image
+# 8. Push an Image to a Registry
 
-These terms are often confusing.
+Let's use Docker Hub as a learning example.
 
-Let's separate them.
-
-Suppose we have:
-
-```text
-registry.example.com/company/payment-service:1.4
-```
-
-Conceptually:
-
-```text
-registry.example.com
-       |
-       +-- company/payment-service
-                 |
-                 +-- 1.4
-```
-
-### Registry
-
-The registry is the service/server:
-
-```text
-registry.example.com
-```
-
-### Repository
-
-The repository is the image collection/name:
-
-```text
-company/payment-service
-```
-
-### Tag
-
-The tag identifies a particular version/reference:
-
-```text
-1.4
-```
-
-So:
-
-```text
-registry.example.com/company/payment-service:1.4
-^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^^^^^^^^ ^^^
-      registry             repository      tag
-```
-
-We'll study **image tags properly in Step 8**.
-
-For now, just understand the distinction.
-
----
-
-# 12. What happens during `docker pull`?
-
-This is an important part of understanding Docker.
-
-Suppose your server executes:
-
-```bash
-docker pull registry.example.com/company/payment-service:1.4
-```
-
-Docker needs to obtain the image from the registry.
-
-Conceptually:
-
-```text
-Server
-  |
-  | docker pull
-  |
-  v
-Registry
-  |
-  | image metadata
-  | image layers
-  v
-Docker Engine
-  |
-  v
-Local Image Store
-```
-
-Docker downloads the required image content.
-
-After that:
+Suppose you already have:
 
 ```bash
 docker images
 ```
 
-can show the image locally.
+and:
+
+```text
+REPOSITORY   TAG
+my-nginx     1.0
+```
+
+A registry expects an image reference containing the appropriate repository path.
+
+Conceptually:
+
+```text
+registry/repository:tag
+```
+
+For example:
+
+```text
+docker.io/myusername/my-nginx:1.0
+```
+
+You can tag the local image with that registry name:
+
+```bash
+docker tag my-nginx:1.0 docker.io/myusername/my-nginx:1.0
+```
+
+Then authenticate:
+
+```bash
+docker login
+```
+
+And push:
+
+```bash
+docker push docker.io/myusername/my-nginx:1.0
+```
+
+The flow is:
+
+```text
+Local Image
+my-nginx:1.0
+     │
+     │ docker tag
+     ▼
+docker.io/myusername/my-nginx:1.0
+     │
+     │ docker push
+     ▼
+Docker Registry
+```
+
+**Important:** `docker tag` does not rebuild or duplicate the image contents. It gives an image another reference/name.
+
+We'll revisit this distinction when we study tags.
+
+---
+
+# 9. Pull an Image From a Registry
+
+Another machine can retrieve the image:
+
+```bash
+docker pull docker.io/myusername/my-nginx:1.0
+```
+
+Conceptually:
+
+```text
+Registry
+    │
+    │ docker pull
+    ▼
+Docker Host
+    │
+    ▼
+my-nginx:1.0
+```
 
 Then:
 
 ```bash
-docker run registry.example.com/company/payment-service:1.4
+docker run myusername/my-nginx:1.0
 ```
 
 can create a container from it.
 
----
-
-# 13. What happens during `docker push`?
-
-Now reverse the direction.
-
-You have:
+So the complete flow is:
 
 ```text
-Local Image
-```
-
-and execute:
-
-```bash
-docker push registry.example.com/company/payment-service:1.4
-```
-
-Conceptually:
-
-```text
-Docker Engine
-     |
-     | image metadata
-     | layers
-     v
+Build
+  ↓
+Image
+  ↓
+Push
+  ↓
 Registry
-```
-
-The registry stores the image content.
-
-This means another machine can later retrieve it.
-
----
-
-# 14. Authentication
-
-Private registries need to know:
-
-> Who are you?
-
-For example:
-
-```bash
-docker login registry.example.com
-```
-
-Docker authenticates against the registry.
-
-Then:
-
-```bash
-docker push registry.example.com/company/payment-service:1.4
-```
-
-can be authorized.
-
-Similarly, a production server might authenticate before pulling:
-
-```bash
-docker login registry.example.com
-```
-
-then:
-
-```bash
-docker pull registry.example.com/company/payment-service:1.4
-```
-
-In production environments, authentication is usually handled more securely through credentials, service accounts, cloud IAM, Kubernetes image pull secrets, or similar mechanisms.
-
-We don't need to go deep into those yet.
-
----
-
-# 15. Registry in CI/CD
-
-Now we can connect this concept to CI/CD.
-
-Suppose a developer pushes code:
-
-```text
-Developer
-    |
-    | git push
-    v
-Git Repository
-    |
-    v
-Jenkins
-```
-
-Jenkins builds the Docker image:
-
-```text
-Jenkins
-   |
-   | docker build
-   v
-Docker Image
-   |
-   | docker push
-   v
-Container Registry
-```
-
-Then your deployment system retrieves the image:
-
-```text
-Container Registry
-        |
-        | docker pull
-        v
-Kubernetes
-        |
-        v
+  ↓
+Pull
+  ↓
+Image
+  ↓
+Run
+  ↓
 Container
 ```
 
-So a typical CI/CD flow becomes:
-
-```text
-                 CI
-                  |
-Developer → Git → Jenkins
-                  |
-                  | build
-                  v
-             Docker Image
-                  |
-                  | push
-                  v
-          Container Registry
-                  |
-                  | pull
-                  v
-                 CD
-                  |
-                  v
-             Kubernetes
-                  |
-                  v
-              Container
-```
-
-This is why registries are extremely important in CI/CD.
-
-The registry acts as the **bridge between image building and image deployment**.
-
 ---
 
-# 16. A very important distinction
+# 10. Registry Does Not Run Your Container
 
-Don't think:
+This is an important distinction.
 
-> "The registry runs my container."
+A registry primarily stores and distributes images.
 
-It doesn't.
-
-A registry **stores and distributes images**.
-
-For example:
+It does **not** normally mean:
 
 ```text
-Registry
-   |
-   | stores image
-   v
-payment-service:1.4
+Registry → runs your application
 ```
 
-Kubernetes or Docker Engine then obtains that image:
+Instead:
 
 ```text
 Registry
-    |
-    | pull
-    v
-Docker/containerd
-    |
-    | create container
-    v
+   │
+   │ stores/distributes
+   ▼
+Docker Image
+   │
+   │ pulled by
+   ▼
+Docker Host / Kubernetes
+   │
+   │ runs
+   ▼
 Container
 ```
 
 So:
 
-```text
-Registry → stores/distributes
-Docker Engine/containerd → runs
-Container → executes application
-```
+* **Registry** → stores/distributes images
+* **Docker Engine** → runs containers
+* **Kubernetes** → orchestrates containers/workloads
 
-These are different responsibilities.
+We'll eventually connect these concepts in your CI/CD and Kubernetes learning.
 
 ---
 
-# 17. Beginner misconceptions
+# 11. What Actually Gets Pushed?
 
-## Misconception 1: "Docker Hub is Docker"
+Remember Part 4.
 
-No.
+An image consists of layers.
 
-```text
-Docker       = container tooling/platform
-Docker Hub   = image registry service
-```
-
----
-
-## Misconception 2: "A registry builds images"
-
-Usually, no.
-
-The build happens somewhere such as:
-
-```text
-Developer machine
-Jenkins
-GitHub Actions runner
-GitLab runner
-```
-
-Then the resulting image is pushed to the registry.
-
-```text
-Build system
-     |
-     | build
-     v
-Image
-     |
-     | push
-     v
-Registry
-```
-
----
-
-## Misconception 3: "The registry runs the container"
-
-No.
-
-The registry stores/distributes the image.
-
-A container runtime runs the container.
-
----
-
-## Misconception 4: "An image only exists in a registry"
-
-No.
-
-An image can exist locally:
-
-```text
-Developer machine
-    |
-    +-- local Docker image
-```
-
-and remotely:
-
-```text
-Registry
-    |
-    +-- stored image
-```
-
----
-
-## Misconception 5: "Every push uploads the entire image from scratch"
-
-Not necessarily.
-
-Because Docker images are composed of layers, existing content can be reused.
-
-This is one reason understanding **image layers before registries** was important.
-
----
-
-# 18. The complete mental model so far
-
-We can now connect all five concepts we've learned.
-
-```text
-                    Dockerfile
-                        |
-                        |
-                 Build Context
-                        |
-                        v
-                  Docker Build
-                        |
-                        v
-                  Image Layers
-                        |
-                        v
-                   Docker Image
-                        |
-                   docker push
-                        |
-                        v
-              +-------------------+
-              |  Image Registry   |
-              +-------------------+
-                        |
-                   docker pull
-                        |
-                        v
-                  Docker Image
-                        |
-                     docker run
-                        |
-                        v
-                    Container
-```
-
-This is the foundation you need before moving deeper into CI/CD.
-
----
-
-# 19. Hands-on: see the concept yourself
-
-You don't need a remote production environment for this lesson.
-
-First check your local images:
+When you push an image:
 
 ```bash
-docker images
+docker push myusername/my-nginx:1.0
 ```
 
-Build a small image:
+Docker pushes the image's required content to the registry.
 
-```bash
-docker build -t my-app:1.0 .
-```
-
-Check it:
-
-```bash
-docker images
-```
-
-At this point:
+Conceptually:
 
 ```text
-Local Docker Engine
-        |
-        +-- my-app:1.0
+Docker Image
+┌───────────────────┐
+│ Layer 3           │
+│ Layer 2           │
+│ Layer 1           │
+└───────────────────┘
+        │
+        │ push
+        ▼
+   Image Registry
 ```
 
-If you have a Docker Hub account, you can then tag it with your registry/repository name and push it.
-
-The important thing isn't memorizing these commands yet.
-
-The important sequence is:
-
-```text
-docker build
-     ↓
-local image
-     ↓
-docker push
-     ↓
-registry
-     ↓
-docker pull
-     ↓
-local image on another machine
-     ↓
-docker run
-```
-
----
-
-# 20. How this connects to our CI/CD lab
-
-Your planned CI/CD architecture will eventually look roughly like:
-
-```text
-                    Git Repository
-                          |
-                          v
-                       Jenkins
-                          |
-                    docker build
-                          |
-                          v
-                    Docker Image
-                          |
-                    docker push
-                          |
-                          v
-                 +----------------+
-                 | Image Registry |
-                 +----------------+
-                          |
-                     docker pull
-                          |
-                          v
-                    Kubernetes
-                          |
-                          v
-                     Container
-```
-
-Later, when we study Kubernetes + Argo CD, this relationship becomes even more important.
+Because layers can be shared, registries can avoid storing duplicate layer content unnecessarily.
 
 For example:
 
 ```text
-Git
- |
- | application manifests
- v
-Argo CD
- |
- | tells Kubernetes what image/version to deploy
- v
-Kubernetes
- |
- | pulls image
- v
-Registry
+Image A ──┐
+          ├── shared base layer
+Image B ──┘
 ```
 
-But **don't worry about that part yet**.
+The registry can store that shared content efficiently.
 
-We first need the Docker fundamentals to be solid.
+This is one reason understanding **layers before registries** was important.
 
 ---
 
-# 21. Beginner level vs advanced level
+# 12. Image Digest
 
-### Beginner — know this now
+There's one more concept we need to introduce: **digest**.
 
-You should understand:
+An image can be referenced by a tag:
 
 ```text
-Image
-   ↓ push
+my-app:1.0
+```
+
+but it can also be identified by a content digest:
+
+```text
+my-app@sha256:abc123...
+```
+
+The digest is based on the image's content/manifest and provides a content-addressed identity.
+
+Conceptually:
+
+```text
+Tag:
+my-app:1.0
+     │
+     └── human-friendly reference
+
+Digest:
+my-app@sha256:...
+     │
+     └── content-based reference
+```
+
+This distinction is extremely important in production deployments because tags can be moved to point to different image versions, while a digest identifies a specific image manifest.
+
+We will go deeper into this in **Part 8 — Image Tags**, but for now just remember:
+
+> **Tag = convenient reference. Digest = immutable content-based reference.**
+
+---
+
+# 13. Why Tags and Digests Matter in CI/CD
+
+Suppose CI builds:
+
+```text
+my-app:1.0
+```
+
+and pushes it.
+
+Later, someone pushes another image using the same tag:
+
+```text
+my-app:1.0
+```
+
+The tag can now refer to a different image.
+
+Therefore:
+
+```text
+Tag
+ │
+ └── can move
+
+Digest
+ │
+ └── identifies specific content
+```
+
+For production deployments, digest-based references can provide stronger reproducibility.
+
+We won't go deeper here because **Part 8 is specifically dedicated to image tags**.
+
+---
+
+# 14. Hands-on Exercise — Local Registry Flow
+
+Before using a public registry, let's understand the workflow using your local Docker environment.
+
+First build:
+
+```bash
+docker build -t registry-demo:1.0 .
+```
+
+Check:
+
+```bash
+docker images
+```
+
+You now have:
+
+```text
+registry-demo:1.0
+```
+
+The image is local:
+
+```text
+Local Docker Host
+└── registry-demo:1.0
+```
+
+The important next step would normally be:
+
+```text
+docker tag
+      ↓
+docker push
+      ↓
 Registry
-   ↓ pull
+```
+
+For the moment, don't push anything publicly unless you want to.
+
+The key workflow is what matters:
+
+```text
+Local Build
+    ↓
+Local Image
+    ↓
+Tag for Registry
+    ↓
+Push
+    ↓
+Registry
+```
+
+---
+
+# 15. Hands-on Exercise — Understand the Image Reference
+
+Run:
+
+```bash
+docker images
+```
+
+You might have:
+
+```text
+REPOSITORY    TAG
+registry-demo 1.0
+```
+
+Now:
+
+```bash
+docker tag registry-demo:1.0 myregistry.example.com/myteam/registry-demo:1.0
+```
+
+Run:
+
+```bash
+docker images
+```
+
+You may now see both:
+
+```text
+REPOSITORY                                  TAG
+registry-demo                              1.0
+myregistry.example.com/myteam/registry-demo 1.0
+```
+
+This does **not** mean Docker created a second independent image.
+
+Both references can point to the same underlying image content.
+
+This is an important point to remember before Part 8.
+
+---
+
+# 16. The Standard CI/CD Pattern
+
+Now combine everything we've learned:
+
+```text
+                   Git Repository
+                         │
+                         │ source code
+                         ▼
+                    CI Pipeline
+                         │
+                         │ docker build
+                         ▼
+                    Docker Image
+                         │
+                         │ docker push
+                         ▼
+                  Image Registry
+                         │
+                         │ docker pull
+                         ▼
+                Deployment Environment
+                         │
+                         │ run
+                         ▼
+                     Container
+```
+
+This is one of the fundamental patterns you'll see in modern CI/CD.
+
+For example:
+
+```text
+Jenkins
+   │
+   ├── checkout
+   ├── test
+   ├── docker build
+   └── docker push
+             │
+             ▼
+          Harbor
+             │
+             ▼
+        Kubernetes
+```
+
+Later, when you build your CI/CD lab, this exact concept will become practical.
+
+---
+
+# 17. Common Mistakes
+
+### Mistake 1 — Thinking the registry builds the image
+
+Incorrect:
+
+```text
+Registry → builds image
+```
+
+Normally:
+
+```text
+CI / Developer
+      │
+      │ docker build
+      ▼
+    Image
+      │
+      │ docker push
+      ▼
+  Registry
+```
+
+---
+
+### Mistake 2 — Thinking Docker Hub is Docker itself
+
+Docker is the technology/platform.
+
+Docker Hub is one registry service.
+
+Conceptually:
+
+```text
+Docker
+  │
+  └── Docker Hub
+       └── Registry service
+```
+
+There are many other registries.
+
+---
+
+### Mistake 3 — Thinking `docker push` sends the Dockerfile
+
+It doesn't.
+
+The normal flow is:
+
+```text
+Dockerfile
+    ↓
+docker build
+    ↓
 Image
-   ↓ run
+    ↓
+docker push
+    ↓
+Registry
+```
+
+The registry primarily receives the image and its metadata/content, not your Dockerfile as the build instructions.
+
+---
+
+### Mistake 4 — Thinking a registry is the same as a repository
+
+They're different:
+
+```text
+Registry
+   │
+   ├── Repository A
+   │
+   ├── Repository B
+   │
+   └── Repository C
+```
+
+A registry hosts repositories.
+
+---
+
+# 18. What You Should Know Now
+
+You should now understand:
+
+* A **registry stores and distributes Docker images**.
+* A **repository** is a named location/collection for related images within a registry.
+* `docker push` uploads an image to a registry.
+* `docker pull` retrieves an image from a registry.
+* A registry is central to the CI/CD build → deploy workflow.
+* Public and private registries serve different organizational needs.
+* Image layers are part of what gets distributed.
+* A tag is a convenient image reference.
+* A digest identifies specific image content.
+* A registry does not normally run your containers.
+
+The key flow is:
+
+```text
+Dockerfile
+    ↓
+docker build
+    ↓
+Docker Image
+    ↓
+docker push
+    ↓
+Registry
+    ↓
+docker pull
+    ↓
+Docker Image
+    ↓
+docker run
+    ↓
 Container
 ```
 
-And:
-
-* A registry stores/distributes images.
-* Docker Hub is one registry.
-* Private registries are common in companies.
-* `docker push` uploads an image.
-* `docker pull` retrieves an image.
-* The registry is not the container runtime.
-* Images consist of layers, and those layers are part of what gets distributed.
-
-### Advanced — don't worry about yet
-
-Later we can explore:
-
-* Registry API
-* OCI image specification
-* manifests
-* image indexes
-* multi-platform images
-* content-addressable storage
-* digests
-* registry authentication
-* image signing
-* SBOMs
-* immutable image references
-* garbage collection
-* Harbor architecture
-* registry mirrors
-* Kubernetes image pull secrets
-
-Those are important eventually, but **not necessary for understanding the basic concept**.
-
 ---
 
-# 22. The one sentence to remember
-
-If you remember only one thing from this lesson:
-
-> **A Docker image registry is a central place that stores and distributes Docker images so that different machines and environments can obtain the same image.**
-
-And the core flow is:
+# Phase 1 Progress
 
 ```text
-BUILD → IMAGE → PUSH → REGISTRY → PULL → IMAGE → RUN → CONTAINER
+Phase 1 — Docker Fundamentals
+
+01. Container vs Image       ✅
+02. Dockerfile               ✅
+03. Build Context            ✅
+04. Docker Image Layers      ✅
+05. Docker Image Registry    ✅
+06. Container Filesystem     ← NEXT
+07. Base Images
+08. Image Tags
 ```
 
-That is **Step 5**.
+We've now completed the part of the roadmap that explains **how an image goes from source code to a shareable artifact**:
 
-Once this mental model is clear, **Step 6 — Container Filesystem** will explain what happens *inside the container after that image has been pulled and used to create a container*.
+```text
+Dockerfile
+     ↓
+Build Context
+     ↓
+Image Layers
+     ↓
+Docker Image
+     ↓
+Registry
+```
+
+**Next: Part 6 — Container Filesystem.**
+
+There we'll examine what actually happens to the filesystem when you run an image as a container, including the relationship between:
+
+```text
+Image layers
+      ↓
+Writable container layer
+      ↓
+Container filesystem
+```
+
+and why changes inside a container normally disappear when the container is removed.
