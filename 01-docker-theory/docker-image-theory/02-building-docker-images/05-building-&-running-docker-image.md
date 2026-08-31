@@ -1,256 +1,44 @@
 # Phase 2 — Build Your First Docker Image
 
-## Part 4 — Configuration & Container Behavior
+## Part 5 — Assemble, Build & Run
 
 ### Where We Are
 
-In Part 3, we established the most important timing distinction in a Dockerfile:
+We've finished the instruction-level teaching:
+
+```text
+FROM
+WORKDIR
+COPY
+RUN
+ENV
+EXPOSE
+ENTRYPOINT
+CMD
+```
+
+and established the key distinction:
 
 ```text
 RUN  → BUILD TIME
 CMD  → RUNTIME
 ```
 
-Our Dockerfile is now:
-
-```dockerfile
-FROM python:3.12
-
-WORKDIR /app
-
-COPY app.py .
-
-CMD ["python", "app.py"]
-```
-
-We understand how the image gets its starting environment and application files, and we know how to define its default startup command.
-
-Now we'll finish the remaining core instructions:
-
-```text
-ENV
-EXPOSE
-ENTRYPOINT
-```
-
-and then compare:
-
-```text
-CMD vs ENTRYPOINT
-```
-
-The focus here is no longer primarily **"what files go into the image?"**
-
-Instead, we're looking at:
-
-> **How do we configure the environment and define container behavior?**
+Now we actually build the image. This part is different from the last few — instead of learning instructions one at a time, we assemble what we've learned and watch Docker turn our application into a real image.
 
 ---
 
-# 1. `ENV` — Define Environment Variables
-
-```dockerfile
-ENV APP_NAME="my-app"
-```
-
-`ENV` defines an **environment variable** in the image.
+# 1. Our Project
 
 ```text
-Docker Image
-    │
-    └── Environment
-          │
-          └── APP_NAME=my-app
+my-app/
+├── app.py
+└── Dockerfile
 ```
-
-When a container is created from that image, the variable is available inside it — a running process can read `APP_NAME=my-app` directly.
-
----
-
-# 2. Why Do We Need Environment Variables?
-
-Applications often need configuration that shouldn't be hardcoded into the code itself — things like:
-
-```text
-APP_ENV
-LOG_LEVEL
-DATABASE_HOST
-DATABASE_PORT
-API_URL
-```
-
-Instead of hardcoding:
 
 ```python
-database_host = "10.10.10.50"
+print("Hello from Docker!")
 ```
-
-the application reads `DATABASE_HOST` from its environment. This means the **same image** can be reused across environments just by changing what's injected:
-
-```text
-Same Image
-    │
-    ├── Development   → DATABASE_HOST=dev-db
-    ├── Testing       → DATABASE_HOST=test-db
-    └── Production    → DATABASE_HOST=prod-db
-```
-
-The image doesn't need to change just because runtime configuration changes.
-
----
-
-# 3. `ENV` Does Not Execute Anything
-
-Compare:
-
-```dockerfile
-RUN pip install flask
-```
-
-with:
-
-```dockerfile
-ENV APP_NAME="my-app"
-```
-
-```text
-RUN → perform an action, during build
-
-ENV → define a value, available at runtime
-```
-
-If we added `ENV APP_NAME="my-app"` to our Dockerfile, it would sit between `COPY` and `CMD` — but our tiny app doesn't read any environment variables yet, so we won't add it to our working example. The concept is what matters here.
-
----
-
-# 4. Important: Don't Put Secrets in the Dockerfile
-
-Avoid putting sensitive credentials directly into `ENV`:
-
-```dockerfile
-ENV DB_PASSWORD="my-secret-password"
-```
-
-**Why this matters:** the Dockerfile itself contains the secret in plain text, and that value becomes part of the image's configuration/history — anyone who can pull or inspect the image can potentially see it. Passwords, API keys, access tokens, and other credentials should generally not be baked into an image this way.
-
-A better approach is to supply sensitive configuration at runtime through a proper secret-management mechanism. We won't go deep into that yet — the rule to remember for now is:
-
-> **`ENV` is for configuration, not for secrets.**
-
----
-
-# 5. `EXPOSE` — Declare an Intended Container Port
-
-```dockerfile
-EXPOSE 8080
-```
-
-`EXPOSE` tells Docker: **this container is intended to listen on port 8080.** If our application were a web server, we'd document that intent here.
-
-**Important:** `EXPOSE` does **not** publish the port. Writing `EXPOSE 8080` does not create a `Host:8080 → Container:8080` mapping. It's documentation/metadata, nothing more.
-
-Actual port publishing happens at `docker run` time:
-
-```bash
-docker run -p 8080:8080 my-app:1.0
-```
-
-```text
-EXPOSE 8080          →  documentation, at build time
-docker run -p 8080:8080  →  actual publishing, at run time
-```
-
-Our current application doesn't listen on a network port, so we won't add `EXPOSE` to our Dockerfile yet — but this distinction will matter a lot once we containerize a web app.
-
----
-
-# 6. `ENTRYPOINT` — Define the Main Executable
-
-```dockerfile
-ENTRYPOINT ["python"]
-```
-
-`ENTRYPOINT` defines the container's **main executable** — the program this container fundamentally runs. Paired with `CMD`:
-
-```dockerfile
-ENTRYPOINT ["python"]
-CMD ["app.py"]
-```
-
-Docker combines them into one effective command:
-
-```bash
-python app.py
-```
-
-A simple way to hold the two apart:
-
-```text
-ENTRYPOINT → what program does this container run?
-CMD        → what should it run by default?
-```
-
----
-
-# 7. Why Have Both, Instead of Just `CMD`?
-
-For our current app, `CMD ["python", "app.py"]` alone is perfectly fine — we don't need `ENTRYPOINT` just because it exists.
-
-`ENTRYPOINT` earns its place when you want the **executable fixed** while the **arguments vary**. For example:
-
-```dockerfile
-ENTRYPOINT ["python"]
-```
-
-lets different containers built from a similar pattern supply different scripts as arguments:
-
-```text
-python app.py
-python script.py
-python worker.py
-```
-
-The executable (`python`) stays constant; only what it runs changes. That's the scenario `ENTRYPOINT` is designed for — and it's why production images built "around" a specific tool (like a CLI) often use it.
-
-For our first image, we'll keep things simple:
-
-```dockerfile
-CMD ["python", "app.py"]
-```
-
-There are more detailed rules about how `CMD`, `ENTRYPOINT`, and arguments passed to `docker run` interact — we don't need to memorize them now. We'll see the behavior directly with real commands once we start running containers in Part 5.
-
----
-
-# 8. The Three Categories We've Now Learned
-
-We can group every instruction covered in Parts 2–4 into three jobs:
-
-### Establish the image
-```text
-FROM      → starting environment
-WORKDIR   → application directory
-COPY      → application files
-```
-
-### Configure during build
-```text
-RUN       → build-time actions
-ENV       → environment configuration
-```
-
-### Define runtime behavior
-```text
-EXPOSE      → intended container port
-ENTRYPOINT  → main executable
-CMD         → default command/arguments
-```
-
-This isn't a rigid technical classification — some instructions blur the lines — but it's a useful way to organize what each instruction is *for* as you read or write a Dockerfile.
-
----
-
-# 9. Our Full Dockerfile — Understanding Every Line
 
 ```dockerfile
 FROM python:3.12
@@ -263,68 +51,174 @@ CMD ["python", "app.py"]
 ```
 
 ```text
-FROM python:3.12        → start with the Python 3.12 image
-WORKDIR /app             → use /app as the working directory
-COPY app.py .            → copy our application into /app
-CMD ["python", "app.py"] → run python app.py by default at container start
+app.py + Dockerfile → docker build → Image (my-app:1.0) → docker run → Container → Hello from Docker!
 ```
 
-And we understand what the unused instructions *would* do if we needed them:
-
-```text
-RUN         → execute something during build
-ENV         → define an environment variable
-EXPOSE      → document an intended container port
-ENTRYPOINT  → define the container's main executable
-```
+Let's do it for real.
 
 ---
 
-# Part 4 Checkpoint
+# 2. Build the Image
 
-### `ENV`
-Defines an environment variable available inside the container. Not for secrets.
+```bash
+cd my-app
+ls
+```
 
-### `EXPOSE`
-Documents an intended container port. Does **not** publish it — `-p` at runtime does that.
+You should see `Dockerfile` and `app.py`. Now:
 
-### `ENTRYPOINT`
-Defines the main executable.
+```bash
+docker build -t my-app:1.0 .
+```
 
-### `CMD`
-Provides the default command/arguments. Combined with `ENTRYPOINT ["python"]`, `CMD ["app.py"]` produces `python app.py`.
+This is the first real build of the phase. Breaking the command down:
+
+```text
+docker        → the CLI
+build         → build an image
+-t my-app:1.0 → name and tag the resulting image
+.             → the build context (Phase 1 callback: current directory)
+```
+
+> Build an image using the current directory as the build context, and name the result `my-app:1.0`.
 
 ---
 
-# The Mental Model
+# 3. What Docker Does During the Build
 
 ```text
-                  Dockerfile
-                      │
-       ┌──────────────┼──────────────┐
-       │              │              │
-       ▼              ▼              ▼
-     IMAGE        CONFIGURATION     RUNTIME
-       │              │              │
-   FROM/COPY         ENV          ENTRYPOINT
-   WORKDIR           EXPOSE           CMD
-       │
-       ▼
-   Docker Image
-       │
-       │ docker run
-       ▼
-   Container
-       │
-       ▼
- Main application
+Read Dockerfile
+     ↓
+FROM python:3.12   → start from base
+     ↓
+WORKDIR /app       → set working directory
+     ↓
+COPY app.py .      → add application
+     ↓
+CMD [...]          → record default command (does NOT execute it)
+     ↓
+my-app:1.0
 ```
 
-**Part 4 is complete.**
+Worth repeating: `CMD` does not run `python app.py` during the build. It only *records* the default runtime command. The application runs later, once a container exists.
 
-In **Part 5 — Assemble, Build & Run**, we stop learning individual instructions and put everything together:
+The exact build output varies by Docker version and cache state — don't worry if yours doesn't match an example exactly. What matters is ending up with `my-app:1.0`.
+
+---
+
+# 4. Verify and Inspect
+
+```bash
+docker images
+```
 
 ```text
-Dockerfile → docker build → Docker Image → docker images →
-docker image inspect → docker run → Hello from Docker!
+REPOSITORY   TAG   IMAGE ID    SIZE
+my-app       1.0   abc123...   ...
 ```
+
+`my-app:1.0` — image name and tag (Phase 1 callback: same `name:tag` format as any other image reference).
+
+Now look inside it:
+
+```bash
+docker image inspect my-app:1.0
+```
+
+This returns a large JSON block — don't try to absorb all of it. Two fields are worth finding on purpose, because they trace directly back to our Dockerfile:
+
+```text
+WorkingDir → should read "/app"           (from WORKDIR /app)
+Cmd        → should read ["python","app.py"]  (from CMD [...])
+```
+
+Seeing your own Dockerfile reflected in the image's actual configuration is the point of this step — it confirms the instructions did what you expect, and reinforces that `Cmd` here is *stored*, not *already run*.
+
+You will see information including things related to:
+
+```text
+Image ID
+Created time
+Architecture
+OS
+Config
+Environment
+Working directory
+Command
+Entrypoint
+Root filesystem
+Layers
+```
+
+This is why `docker image inspect` is useful:
+
+> **It lets us examine how Docker understands the image.**
+
+---
+
+# 5. Run It
+
+```bash
+docker run my-app:1.0
+```
+
+```text
+Image (my-app:1.0) → docker run → Container → CMD fires → python app.py → "Hello from Docker!"
+```
+
+Docker didn't rebuild anything here — the image already existed. `docker run` only creates a new container from it and starts its default command.
+
+You'll notice the container prints the message and then your terminal returns immediately — the container has already stopped. That's expected, and it's the subject of the next part (Part 6) in detail: for now, just know it's because the main process (`python app.py`) finished and exited normally, not because anything went wrong.
+
+---
+
+# 6. What Each Command Does
+
+| Command | Purpose |
+|---|---|
+| `docker build -t my-app:1.0 .` | Creates the image from the Dockerfile + build context |
+| `docker images` | Lists images available locally |
+| `docker image inspect my-app:1.0` | Shows the image's detailed metadata/configuration |
+| `docker run my-app:1.0` | Creates and starts a container from the image |
+
+---
+
+# 7. Why This Matters
+
+Notice what we *didn't* do on the host: no manually installing Python, creating `/app`, copying the file by hand, or remembering a startup command. All of that was described once, in the Dockerfile, and Docker turned it into a reusable image:
+
+> **The Dockerfile turns a repeatable set of instructions into a reusable artifact.**
+
+If you build again right now without changing anything —
+
+```bash
+docker build -t my-app:1.0 .
+```
+
+— Docker may reuse previously-built layers instead of redoing identical work (Phase 1 callback: this is the layer/cache behavior from Part 4 of Phase 1). You don't need to study cache optimization yet — just notice that Docker isn't necessarily repeating unchanged steps from scratch.
+
+---
+
+# Part 5 Checkpoint
+
+You should be able to run this whole workflow yourself and explain each stage:
+
+```text
+docker build          → produces the IMAGE
+docker images         → lists it
+docker image inspect  → lets you examine it
+docker run            → produces a CONTAINER from it
+```
+
+```bash
+docker build -t my-app:1.0 .
+docker images
+docker image inspect my-app:1.0
+docker run my-app:1.0
+```
+
+Expected output: `Hello from Docker!`
+
+**Part 5 is complete.** We've moved from *learning* Dockerfile instructions to actually *building and running* an image.
+
+In **Part 6 — What Actually Happened**, we'll properly examine why the container stopped, look at image vs. container more concretely, and finish with a hands-on exercise that serves as the Phase 2 checkpoint.
